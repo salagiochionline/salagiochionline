@@ -349,62 +349,111 @@ window.CC_POOL={"persone":[{"s":"F","h":"ne","L":true,"R":false,"e":"ma","g":tru
   const FUR_LIGHT = { ne: '#4a4954', bi: '#ffffff', ma: '#c9996a', ar: '#f8c38c', gr: '#c3c8d0' };
   const ACC = ['#e03131', '#1c7ed6', '#2f9e44', '#ae3ec9', '#f08c00'];
 
-  /* ---------------- persone ---------------- */
+  /* ---------------- persone (ritratti "dipinti", stile carte classiche) ---------------- */
+  const BG2 = ['#cfe1ee', '#f1dcc4', '#d6e8cf', '#ead3dc', '#dcd5f0', '#f4ecc4', '#c8e4e0', '#f0d3cd'];
+  const CLOTH = ['#b5482a', '#2f5f8f', '#3f7a46', '#7a4a8c', '#c9902b', '#9c2f4f', '#4a4f57', '#2a7f74'];
+  const LIP = ['#d9837b', '#cf7469', '#c0625a', '#a8554a', '#8a4438', '#6e3528'];
+  const DEFS = `<radialGradient id="ccShade" cx=".42" cy=".36" r=".72"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".30"/></radialGradient>`
+    + `<linearGradient id="ccHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></linearGradient>`
+    + `<linearGradient id="ccCloth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></linearGradient>`
+    + `<radialGradient id="ccVig" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></radialGradient>`
+    + `<radialGradient id="ccBlush"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".55"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient>`
+    + `<radialGradient id="ccIris" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>`;
+  const ov = (d, g) => `<path d="${d}" fill="url(#${g})"/>`;
   function person(t) {
-    const sk = SKIN[t.sk], skd = shade(sk, -18), hc = HAIR[t.h] || '#555', hl = HAIR_LINE[t.h] || '#333';
-    const bald = t.h === 'cv';
-    let s = `<rect width="100" height="120" fill="${BG[t.bg]}"/>`;
-    // capelli dietro (lunghi)
+    const sk = SKIN[t.sk], skd = shade(sk, -24), skdd = shade(sk, -42), hc = HAIR[t.h] || '#555', hl = HAIR_LINE[t.h] || '#333';
+    const bald = t.h === 'cv', F = t.s === 'F';
+    const old = t.h === 'bn' || (bald && t.sk % 2 === 0);
+    let s = '';
+    // capelli lunghi dietro
     if (t.L) {
-      if (t.R) { let c = ''; for (let i = 0; i < 15; i++) { const a = Math.PI * (0.92 + i * 0.081); const r = 28; c += `<circle cx="${50 + Math.cos(a) * r * 1.02}" cy="${60 - Math.sin(a) * r * 1.25 * (i < 3 || i > 11 ? -0.6 : 1)}" r="9"/>`; } s += `<g fill="${hc}" stroke="${hl}" stroke-width="1">${c}<circle cx="26" cy="86" r="9"/><circle cx="74" cy="86" r="9"/><circle cx="24" cy="98" r="8"/><circle cx="76" cy="98" r="8"/><circle cx="25" cy="72" r="9"/><circle cx="75" cy="72" r="9"/></g>`; }
-      else s += `<path d="M24 50 Q22 24 50 23 Q78 24 76 50 L79 104 Q64 110 50 106 Q36 110 21 104 Z" fill="${hc}" stroke="${hl}" stroke-width="1.2"/>`;
+      if (t.R) {
+        let c = '';
+        const pts = [[27, 40], [24, 52], [23, 64], [24, 76], [26, 88], [29, 99], [73, 40], [76, 52], [77, 64], [76, 76], [74, 88], [71, 99], [33, 30], [67, 30], [30, 104], [70, 104]];
+        for (const [x, y] of pts) c += `<circle cx="${x}" cy="${y}" r="8.5"/>`;
+        s += `<g fill="${hc}" stroke="${hl}" stroke-width=".8">${c}</g><g fill="url(#ccHair)">${c}</g>`;
+      } else {
+        const d = 'M26 48 Q23 20 50 19 Q77 20 74 48 L78 106 Q64 112 50 108 Q36 112 22 106 Z';
+        s += `<path d="${d}" fill="${hc}" stroke="${hl}" stroke-width="1"/>${ov(d, 'ccHair')}<path d="M30 60 L28 100 M70 60 L72 100 M34 70 L33 102 M66 70 L67 102" stroke="${hl}" stroke-width=".7" opacity=".45" fill="none"/>`;
+      }
     }
-    // spalle e collo
-    s += `<path d="M10 122 Q12 97 50 95 Q88 97 90 122 Z" fill="${SHIRT[t.sh]}"/><path d="M40 96 Q50 104 60 96" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
-    s += `<rect x="42.5" y="76" width="15" height="22" rx="6" fill="${skd}"/>`;
+    // abiti
+    const cc = CLOTH[t.sh], ccd = shade(cc, -28), v = t.sh % 4;
+    const body = 'M5 122 Q7 101 28 96.5 Q40 93.5 50 98.5 Q60 93.5 72 96.5 Q93 101 95 122 Z';
+    s += `<path d="${body}" fill="${cc}"/>${ov(body, 'ccCloth')}`;
+    // collo
+    const neck = 'M41.5 74 L41 93 Q50 100 59 93 L58.5 74 Z';
+    s += `<path d="${neck}" fill="${skd}"/><path d="M41.5 80 Q50 88 58.5 80 L58.5 76 L41.5 76 Z" fill="#000" opacity=".16"/>`;
+    if (v === 0) s += `<path d="M40 94.5 Q50 103 60 94.5" stroke="${ccd}" stroke-width="2.4" fill="none"/>`;
+    else if (v === 1) s += `<path d="M40.5 93 L50 104 L43 107 L37.5 96 Z M59.5 93 L50 104 L57 107 L62.5 96 Z" fill="#f6f4ef" stroke="#c9c4ba" stroke-width=".6"/>`;
+    else if (v === 2) s += `<path d="M42 94 L50 106 L58 94 Z" fill="#f2efe8"/><path d="M50 106 L48.6 121 L51.4 121 Z" fill="${shade(cc, 30)}"/><path d="M36 96 L48 112 L44 122 L30 98 Z M64 96 L52 112 L56 122 L70 98 Z" fill="${ccd}"/>`;
+    else s += `<path d="M39.5 84 Q50 90 60.5 84 L61 97 Q50 103 39 97 Z" fill="${shade(cc, 8)}" stroke="${ccd}" stroke-width=".8"/><path d="M41 88 L41 97 M45 89.5 L45 99 M50 90 L50 100 M55 89.5 L55 99 M59 88 L59 97" stroke="${ccd}" stroke-width=".6" opacity=".6"/>`;
     // orecchie
-    s += `<ellipse cx="28.5" cy="58" rx="4.5" ry="6.5" fill="${sk}" stroke="${skd}"/><ellipse cx="71.5" cy="58" rx="4.5" ry="6.5" fill="${sk}" stroke="${skd}"/>`;
-    if (t.o) s += `<g fill="#ffd43b" stroke="#b08900" stroke-width="1"><circle cx="28" cy="66.5" r="2.6"/><circle cx="72" cy="66.5" r="2.6"/><circle cx="28" cy="71" r="2"/><circle cx="72" cy="71" r="2"/></g>`;
-    // testa
-    s += `<ellipse cx="50" cy="56" rx="22" ry="26" fill="${sk}" stroke="${skd}" stroke-width="1"/>`;
-    if (bald) s += `<ellipse cx="43" cy="37" rx="7" ry="3.5" fill="#fff" opacity=".35"/><path d="M28.5 52 Q28 46 31 44" stroke="${shade(sk, -30)}" fill="none" stroke-width="1"/>`;
+    for (const [x, k] of [[29.5, 1], [70.5, -1]]) s += `<ellipse cx="${x}" cy="56" rx="4.3" ry="6.8" fill="${sk}" stroke="${skd}" stroke-width=".8"/><path d="M${x + k * 1.2} 52 Q${x - k * 1.6} 56 ${x + k * .8} 60" stroke="${skdd}" stroke-width=".8" fill="none" opacity=".6"/>`;
+    if (t.o) s += `<g fill="none" stroke="#e8b923" stroke-width="1.4"><circle cx="29.3" cy="65.6" r="2.6"/><circle cx="70.7" cy="65.6" r="2.6"/></g><g fill="#fff3b0"><circle cx="28.5" cy="63.6" r=".7"/><circle cx="69.9" cy="63.6" r=".7"/></g>`;
+    // viso
+    const face = F ? 'M31 50 Q31 26 50 25 Q69 26 69 50 Q69 65 63.5 75 Q57 85 50 86 Q43 85 36.5 75 Q31 65 31 50 Z'
+      : 'M30 50 Q30 25 50 24 Q70 25 70 50 Q70 66 65 77 Q58 88 50 88 Q42 88 35 77 Q30 66 30 50 Z';
+    s += `<path d="${face}" fill="${sk}" stroke="${skd}" stroke-width=".8"/>${ov(face, 'ccShade')}`;
+    if (bald) s += `<ellipse cx="44" cy="31" rx="8" ry="3.6" fill="#fff" opacity=".35" transform="rotate(-12 44 31)"/>`;
+    if (old) s += `<path d="M40 37.5 Q50 35.5 60 37.5 M42 40.5 Q50 39 58 40.5" stroke="${skdd}" stroke-width=".7" fill="none" opacity=".55"/><path d="M43.5 64 Q40.5 69 42 74.5 M56.5 64 Q59.5 69 58 74.5" stroke="${skdd}" stroke-width=".8" fill="none" opacity=".5"/>`;
     // capelli davanti
     if (!bald) {
-      if (t.R) { let c = ''; for (let i = 0; i <= 10; i++) { const a = Math.PI * (1.02 - i * 0.104); c += `<circle cx="${50 + Math.cos(a) * 21}" cy="${43 - Math.sin(a) * 15}" r="${6.6 + (i % 2)}"/>`; } s += `<g fill="${hc}" stroke="${hl}" stroke-width="1">${c}<circle cx="50" cy="26" r="9"/><circle cx="40" cy="28" r="8"/><circle cx="60" cy="28" r="8"/></g>`; }
-      else if (t.L) s += `<path d="M26 62 Q23 26 50 26 Q77 26 74 62 L71 62 Q71 41 ${t.hv ? '58 36 Q44 44 32 40' : '50 37 Q36 37 30 46'} Q29 52 29 62 Z" fill="${hc}" stroke="${hl}" stroke-width="1.2"/>`;
-      else if (t.s === 'F') s += `<path d="M25 66 Q22 25 50 25 Q78 25 75 66 Q74 70 71 66 L71 50 Q66 38 ${t.hv ? '54 37 Q40 44 30 42 L29 66 Q26 70 25 66 Z' : '50 37 Q36 37 30 46 L29 66 Q26 70 25 66 Z'}" fill="${hc}" stroke="${hl}" stroke-width="1.2"/>`;
-      else s += t.hv
-        ? `<path d="M27 54 Q24 27 50 27 Q76 27 73 54 Q71 44 66 40 Q54 38 44 41 Q36 36 31 44 Q28 48 27 54 Z" fill="${hc}" stroke="${hl}" stroke-width="1.2"/>`
-        : `<path d="M27 52 Q25 27 50 27 Q75 27 73 52 Q72 42 64 38 L60 42 L56 37 L50 42 L44 37 L39 42 L35 38 Q29 42 27 52 Z" fill="${hc}" stroke="${hl}" stroke-width="1.2"/>`;
+      let d;
+      if (t.R) {
+        let c = ''; for (let i = 0; i <= 9; i++) { const a = Math.PI * (1.04 - i * 0.12); c += `<circle cx="${(50 + Math.cos(a) * 20).toFixed(1)}" cy="${(41 - Math.sin(a) * 15).toFixed(1)}" r="${6.2 + (i % 2) * .8}"/>`; }
+        c += `<circle cx="50" cy="24" r="8"/><circle cx="41" cy="26" r="7"/><circle cx="59" cy="26" r="7"/>`;
+        if (!t.L && F) c += `<circle cx="30" cy="54" r="6"/><circle cx="70" cy="54" r="6"/><circle cx="30.5" cy="64" r="5.5"/><circle cx="69.5" cy="64" r="5.5"/>`;
+        s += `<g fill="${hc}" stroke="${hl}" stroke-width=".8">${c}</g><g fill="url(#ccHair)">${c}</g>`;
+      } else {
+        if (t.L) d = t.hv ? 'M28 64 Q25 25 50 23 Q75 25 72 64 Q70 44 64 37 Q53 41 41 33 Q32 42 28 64 Z' : 'M28 64 Q25 25 50 23 Q75 25 72 64 Q69 46 62 36 Q56 31 50 31.5 Q44 31 38 36 Q31 46 28 64 Z';
+        else if (F) d = t.hv ? 'M26 74 Q22 30 50 22 Q78 30 74 74 Q71 78 68 74 Q69 50 64 40 Q52 44 40 35 Q32 44 32 74 Q29 78 26 74 Z' : 'M26 74 Q22 30 50 22 Q78 30 74 74 Q71 78 68 74 Q69 50 65 40 Q60 36 50 37 Q40 36 35 40 Q31 50 32 74 Q29 78 26 74 Z';
+        else d = t.hv ? 'M30 54 Q27 20 53 19.5 Q75 21 70 52 Q69 39 63 34 Q56 37.5 47 34 Q38 32 34 38 Q31 44 30 54 Z' : 'M30 54 Q28 22 50 21 Q72 22 70 54 Q69 42 65 37 Q58 33 50 34 Q42 33 35 37 Q31 42 30 54 Z';
+        s += `<path d="${d}" fill="${hc}" stroke="${hl}" stroke-width="1"/>${ov(d, 'ccHair')}`;
+        s += `<path d="${F || t.L ? 'M42 26 Q36 34 33 46 M58 26 Q64 34 67 46 M50 24 Q48 28 46 32' : 'M38 26 Q35 30 34 36 M62 26 Q65 30 66 36 M46 23 Q44 27 42 31 M54 23 Q57 27 59 31'}" stroke="${hl}" stroke-width=".7" opacity=".5" fill="none"/>`;
+      }
     }
     // sopracciglia
-    const bc = bald ? '#5a4a3a' : (t.h === 'bn' ? '#9a9a9a' : hl);
-    s += `<path d="M36 47 Q41 44 46 46.5 M54 46.5 Q59 44 64 47" stroke="${bc}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    const bc = bald ? '#6b5440' : (t.h === 'bn' ? '#a9a9a9' : t.h === 'bi' ? '#c9a03a' : hl);
+    s += `<path d="M34.6 45.4 Q40.5 40.2 47.4 43.2 Q40.8 42.2 35 46.6 Z M65.4 45.4 Q59.5 40.2 52.6 43.2 Q59.2 42.2 65 46.6 Z" fill="${bc}" stroke="${bc}" stroke-width="${F ? .9 : 1.5}" stroke-linejoin="round"/>`;
     // occhi
-    s += eyes(EYE[t.e], 41, 59, 55.5);
-    // guance, lentiggini
-    if (t.G) s += `<circle cx="36" cy="66" r="4.6" fill="#ff6b6b" opacity=".5"/><circle cx="64" cy="66" r="4.6" fill="#ff6b6b" opacity=".5"/>`;
-    if (t.F) s += `<g fill="#a0522d" opacity=".75"><circle cx="40" cy="62.5" r=".9"/><circle cx="43" cy="64" r=".9"/><circle cx="38" cy="65" r=".9"/><circle cx="60" cy="62.5" r=".9"/><circle cx="57" cy="64" r=".9"/><circle cx="62" cy="65" r=".9"/></g>`;
+    const ic = EYE[t.e];
+    for (const x of [42, 58]) {
+      const al = `M${x - 6.5} 53 Q${x} 46 ${x + 6.5} 53 Q${x} 59.6 ${x - 6.5} 53 Z`;
+      s += `<path d="${al}" fill="#fbf8f3" stroke="${skdd}" stroke-width=".6"/><circle cx="${x}" cy="53" r="3.1" fill="${ic}"/><circle cx="${x}" cy="53" r="3.1" fill="url(#ccIris)"/><circle cx="${x}" cy="53" r="1.35" fill="#111"/><circle cx="${x + 1.1}" cy="51.9" r=".9" fill="#fff"/>`
+        + `<path d="M${x - 6.9} 53.2 Q${x} 45.6 ${x + 6.9} 53.2" stroke="#2b1d16" stroke-width="${F ? 1.6 : 1.2}" fill="none" stroke-linecap="round"/>`;
+      if (old) s += `<path d="M${x - 4.5} 57.6 Q${x} 59.6 ${x + 4.5} 57.6" stroke="${skdd}" stroke-width=".6" fill="none" opacity=".6"/>`;
+    }
+    // guance e lentiggini
+    if (t.G) s += `<circle cx="37" cy="64.5" r="6.5" fill="url(#ccBlush)"/><circle cx="63" cy="64.5" r="6.5" fill="url(#ccBlush)"/>`;
+    if (t.F) s += `<g fill="#9a5230" opacity=".7"><circle cx="39" cy="61" r=".75"/><circle cx="42" cy="62.6" r=".75"/><circle cx="37" cy="63.6" r=".75"/><circle cx="40.5" cy="65" r=".75"/><circle cx="61" cy="61" r=".75"/><circle cx="58" cy="62.6" r=".75"/><circle cx="63" cy="63.6" r=".75"/><circle cx="59.5" cy="65" r=".75"/></g>`;
     // naso
-    s += t.N ? `<path d="M48 56 Q44 66 44.5 68 Q46 71.5 50 70.5 Q54 71.5 55.5 68 Q56 66 52 56" fill="${shade(sk, -10)}" stroke="${shade(sk, -38)}" stroke-width="1.2"/>`
-      : `<path d="M50 59 Q47.5 65 50 66.5" stroke="${shade(sk, -38)}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
-    // barba, baffi
-    const fc = bald ? HAIR.ca : hc, fl = bald ? HAIR_LINE.ca : hl;
-    if (t.b) s += `<path d="M28 58 Q27 90 50 91 Q73 90 72 58 Q70 74 63 77 Q50 82 37 77 Q30 74 28 58 Z" fill="${fc}" stroke="${fl}" stroke-width="1"/>`;
+    if (t.N) { const n = 'M48 53 Q45.5 61 43.6 65 Q44.5 70.5 50 70 Q55.5 70.5 56.4 65 Q54.5 61 52 53 Z'; s += `<path d="${n}" fill="${shade(sk, -8)}" stroke="${skdd}" stroke-width=".9"/>${ov(n, 'ccShade')}<path d="M46.5 67.2 Q47.5 68.4 48.6 67.6 M53.5 67.2 Q52.5 68.4 51.4 67.6" stroke="${skdd}" stroke-width=".9" fill="none"/>`; }
+    else s += `<path d="M50.5 54 Q51.5 60 53 63.6" stroke="${skd}" stroke-width="1" fill="none" opacity=".8"/><path d="M46.6 63.6 Q48.4 66.2 50 65.4 Q51.6 66.2 53.4 63.6" stroke="${skdd}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`;
+    // barba
+    const fc = bald ? (t.sk >= 4 ? '#2a1d17' : HAIR.ca) : hc, fl = bald ? (t.sk >= 4 ? '#000' : HAIR_LINE.ca) : hl;
+    if (t.b) { const bd = 'M30 55 Q30 78 38 86 Q44 93 50 93 Q56 93 62 86 Q70 78 70 55 Q67 69 60.5 71.5 Q55 69.5 50 70.5 Q45 69.5 39.5 71.5 Q33 69 30 55 Z'; s += `<path d="${bd}" fill="${fc}" stroke="${fl}" stroke-width=".8"/>${ov(bd, 'ccHair')}<path d="M38 78 L39 82 M44 82 L44.5 86 M56 82 L55.5 86 M62 78 L61 82 M50 84 L50 88" stroke="${fl}" stroke-width=".6" opacity=".5"/>`; }
     // bocca
-    s += t.D ? `<path d="M42 73.5 Q50 85 58 73.5 Z" fill="#7a1f2b" stroke="#5c1520" stroke-width="1" stroke-linejoin="round"/><path d="M43.3 74.3 L56.7 74.3 Q56 76.6 50 77 Q44 76.6 43.3 74.3 Z" fill="#fff"/>`
-      : `<path d="M43.5 75 Q50 80 56.5 75" stroke="#9c3a3a" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
-    if (t.m) s += `<path d="M39.5 73 Q44 67 50 70 Q56 67 60.5 73 Q55 71.5 50 72.2 Q45 71.5 39.5 73 Z" fill="${fc}" stroke="${fl}" stroke-width="1"/>`;
+    const lip = F ? '#c84d63' : LIP[t.sk];
+    if (t.D) s += `<path d="M42.4 72.6 Q50 71.2 57.6 72.6 Q55 78.4 50 78.6 Q45 78.4 42.4 72.6 Z" fill="#6b2230" stroke="${shade(lip, -25)}" stroke-width=".9"/><path d="M43.4 73 Q50 71.9 56.6 73 Q55.6 75.6 50 75.9 Q44.4 75.6 43.4 73 Z" fill="#fff"/><path d="M47 73 L47 75.6 M53 73 L53 75.6" stroke="#ddd" stroke-width=".4"/>`;
+    else s += `<path d="M43 73.2 Q46.5 71.6 50 72.6 Q53.5 71.6 57 73.2 Q50 74.2 43 73.2 Z" fill="${lip}"/><path d="M43 73.2 Q50 78.6 57 73.2 Q50 75.2 43 73.2 Z" fill="${shade(lip, 12)}"/><path d="M42.6 73.2 Q50 75 57.4 73.2" stroke="${shade(lip, -35)}" stroke-width=".9" fill="none" stroke-linecap="round"/>`;
+    if (t.m) { const md = 'M40.5 71.6 Q44.5 66.8 50 69 Q55.5 66.8 59.5 71.6 Q56.5 72.6 53.2 71.2 Q50 72.6 46.8 71.2 Q43.5 72.6 40.5 71.6 Z'; s += `<path d="${md}" fill="${fc}" stroke="${fl}" stroke-width=".8"/>${ov(md, 'ccHair')}`; }
     // occhiali
-    if (t.g) s += glasses(41, 59, 55.5);
+    if (t.g) {
+      const fr = t.hc % 2 ? '#5a3a22' : '#1f1f1f';
+      s += t.hc % 3 === 0
+        ? `<g fill="rgba(255,255,255,.16)" stroke="${fr}" stroke-width="1.6"><rect x="34.2" y="47.6" width="15.2" height="11" rx="3.2"/><rect x="50.6" y="47.6" width="15.2" height="11" rx="3.2"/></g>`
+        : `<g fill="rgba(255,255,255,.16)" stroke="${fr}" stroke-width="1.6"><circle cx="42" cy="53" r="7.4"/><circle cx="58" cy="53" r="7.4"/></g>`;
+      s += `<path d="M49.4 51.6 Q50 50.2 50.6 51.6 M34.4 51 L29.5 49.6 M65.6 51 L70.5 49.6" stroke="${fr}" stroke-width="1.5" fill="none"/><path d="M37 49.6 L39.6 48.6 M53 49.6 L55.6 48.6" stroke="#fff" stroke-width=".9" opacity=".7"/>`;
+    }
     // cappello
     if (t.c) {
-      const c = HATC[t.hc], cd = shade(c, -25);
-      if (t.ht === 0) s += `<path d="M26 45 Q25 21 50 20 Q75 21 74 45 Z" fill="${c}" stroke="${cd}" stroke-width="1.2"/><path d="M50 43 Q76 40 84 46 Q74 50 50 47 Z" fill="${cd}"/><circle cx="50" cy="20.5" r="2.4" fill="${cd}"/>`;
-      else if (t.ht === 1) s += `<path d="M33 40 L35 16 Q50 11 65 16 L67 40 Z" fill="${c}" stroke="${cd}" stroke-width="1.2"/><rect x="34" y="32" width="32" height="5" fill="${cd}"/><ellipse cx="50" cy="41" rx="31" ry="5.5" fill="${c}" stroke="${cd}" stroke-width="1.2"/>`;
-      else s += `<path d="M27 44 Q25 18 50 18 Q75 18 73 44 Z" fill="${c}" stroke="${cd}" stroke-width="1.2"/><rect x="25.5" y="38" width="49" height="9" rx="4" fill="${cd}"/><circle cx="50" cy="16" r="5.5" fill="#fff" stroke="#ccc"/>`;
+      const c = HATC[t.hc], cd = shade(c, -28);
+      if (t.ht === 0) { const cr = 'M28 43 Q27 17 50 16 Q73 17 72 43 Z'; s += `<path d="${cr}" fill="${c}" stroke="${cd}" stroke-width="1"/>${ov(cr, 'ccHair')}<path d="M50 41 Q77 37 87 44 Q75 48.5 50 45 Z" fill="${cd}"/><path d="M50 17 L50 42 M38 19.5 Q35 30 34 42 M62 19.5 Q65 30 66 42" stroke="${cd}" stroke-width=".7" opacity=".6" fill="none"/><circle cx="50" cy="16.5" r="2.2" fill="${cd}"/>`; }
+      else if (t.ht === 1) { const cr = 'M32 37 Q32 14 50 11 Q68 14 68 37 Z'; s += `<path d="${cr}" fill="${c}" stroke="${cd}" stroke-width="1"/>${ov(cr, 'ccHair')}<path d="M44 14 Q50 19 56 14" stroke="${cd}" stroke-width="1" fill="none"/><rect x="32.3" y="30" width="35.4" height="5.5" fill="#2b2b2b" opacity=".75"/><ellipse cx="50" cy="38" rx="31" ry="5.6" fill="${c}" stroke="${cd}" stroke-width="1"/><ellipse cx="50" cy="38" rx="31" ry="5.6" fill="url(#ccCloth)"/>`; }
+      else { const cr = 'M28 45 Q26 15 50 15 Q74 15 72 45 Z'; s += `<path d="${cr}" fill="${c}" stroke="${cd}" stroke-width="1"/>${ov(cr, 'ccHair')}<rect x="26.5" y="38.5" width="47" height="9" rx="4" fill="${cd}"/><path d="M31 39 L31 47 M36 39 L36 47 M41 39 L41 47 M46 39 L46 47 M51 39 L51 47 M56 39 L56 47 M61 39 L61 47 M66 39 L66 47 M71 39 L71 47" stroke="${shade(c, -45)}" stroke-width=".8" opacity=".6"/><circle cx="50" cy="13.5" r="5.5" fill="#f4f1ea" stroke="#cfc8bb"/>`; }
     }
-    return s;
+    return `<rect width="100" height="120" fill="${BG2[t.bg]}"/><rect width="100" height="120" fill="url(#ccVig)"/><g transform="translate(-8.5 -4) scale(1.17)">${s}</g>`;
   }
   function eyes(ic, xl, xr, y) {
     let s = '';
@@ -420,20 +469,20 @@ window.CC_POOL={"persone":[{"s":"F","h":"ne","L":true,"R":false,"e":"ma","g":tru
     const f = FUR[t.p], fl = FUR_LINE[t.p], li = FUR_LIGHT[t.p];
     const spot = t.p === 'bi' ? '#3a3940' : '#faf7f0';
     const cat = t.k === 'g';
-    let s = `<rect width="100" height="120" fill="${BG[t.bg]}"/>`;
+    let s = `<rect width="100" height="120" fill="${BG2[t.bg]}"/><rect width="100" height="120" fill="url(#ccVig)"/>`;
     // corpo
-    s += `<ellipse cx="50" cy="114" rx="30" ry="22" fill="${f}" stroke="${fl}" stroke-width="1.2"/>`;
+    s += `<ellipse cx="50" cy="114" rx="30" ry="22" fill="${f}" stroke="${fl}" stroke-width="1.2"/><ellipse cx="50" cy="114" rx="30" ry="22" fill="url(#ccCloth)"/>`;
     if (t.M) s += `<ellipse cx="60" cy="108" rx="9" ry="7" fill="${spot}"/>`;
     // pelo lungo: ciuffi attorno alla testa
     const hy = cat ? 62 : 58, rx = cat ? 26 : 24, ry = cat ? 23 : 25;
-    if (t.L) { let c = ''; for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; c += `<circle cx="${(50 + Math.cos(a) * (rx + 1)).toFixed(1)}" cy="${(hy + Math.sin(a) * (ry + 1)).toFixed(1)}" r="5.2"/>`; } s += `<g fill="${f}" stroke="${fl}" stroke-width="1">${c}</g>`; }
+    if (t.L) { let c = ''; for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; c += `<circle cx="${(50 + Math.cos(a) * (rx + 1)).toFixed(1)}" cy="${(hy + Math.sin(a) * (ry + 1)).toFixed(1)}" r="5.2"/>`; } s += `<g fill="${f}" stroke="${fl}" stroke-width="1">${c}</g><g fill="url(#ccHair)">${c}</g>`; }
     // orecchie
     if (cat) {
       if (t.P) s += `<path d="M27 52 Q27 36 40 38 Q36 46 27 52 Z M73 52 Q73 36 60 38 Q64 46 73 52 Z" fill="${f}" stroke="${fl}" stroke-width="1.2"/>`;
       else s += `<path d="M27 54 L29 24 L47 42 Z M73 54 L71 24 L53 42 Z" fill="${f}" stroke="${fl}" stroke-width="1.2" stroke-linejoin="round"/><path d="M31 47 L32 31 L42 41 Z M69 47 L68 31 L58 41 Z" fill="#f7a8c4"/>`;
     } else if (!t.P) s += `<path d="M30 46 L27 14 L46 34 Z M70 46 L73 14 L54 34 Z" fill="${f}" stroke="${fl}" stroke-width="1.2" stroke-linejoin="round"/><path d="M32 40 L30 22 L41 34 Z M68 40 L70 22 L59 34 Z" fill="${shade(f, -14)}"/>`;
     // testa
-    s += `<ellipse cx="50" cy="${hy}" rx="${rx}" ry="${ry}" fill="${f}" stroke="${fl}" stroke-width="1.2"/>`;
+    s += `<ellipse cx="50" cy="${hy}" rx="${rx}" ry="${ry}" fill="${f}" stroke="${fl}" stroke-width="1.2"/><ellipse cx="50" cy="${hy}" rx="${rx}" ry="${ry}" fill="url(#ccShade)"/>`;
     if (t.M) s += `<path d="M${cat ? '33 46 Q30 60 40 64 Q50 60 47 48 Q42 42 33 46' : '32 42 Q28 58 40 62 Q50 58 47 44 Q40 38 32 42'} Z" fill="${spot}"/><circle cx="${cat ? 64 : 63}" cy="${cat ? 44 : 40}" r="5" fill="${spot}"/>`;
     // orecchie pendenti del cane (sopra la testa)
     if (!cat && t.P) s += `<path d="M31 38 Q16 40 18 66 Q20 80 29 74 Q33 58 36 42 Z M69 38 Q84 40 82 66 Q80 80 71 74 Q67 58 64 42 Z" fill="${shade(f, t.p === 'ne' ? 10 : -14)}" stroke="${fl}" stroke-width="1.2"/>`;
@@ -521,7 +570,7 @@ window.CC_POOL={"persone":[{"s":"F","h":"ne","L":true,"R":false,"e":"ma","g":tru
     const st = SETS[set], t = st.byId[id]; if (!t) return '';
     return cache[k] = `<svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${st.draw(t)}</svg>`;
   }
-  const api = { SETS, svg, shade };
+  const api = { SETS, svg, shade, DEFS: `<svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false"><defs>${DEFS}</defs></svg>` };
   if (typeof module !== 'undefined') module.exports = api; else window.CCArt = api;
 })();
 
@@ -883,7 +932,7 @@ window.CC_POOL={"persone":[{"s":"F","h":"ne","L":true,"R":false,"e":"ma","g":tru
 const E = window.CCEngine, A = window.CCArt;
 
 /* Indirizzo della home "Tavolata" con tutti i giochi. */
-const HUB_URL = '../';
+const HUB_URL = 'https://onlineboardgames.netlify.app';
 
 /* ---------------- utilità ---------------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -2155,6 +2204,7 @@ function bindGlobal() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideInfo(); hideSheet(); } });
   window.addEventListener('hashchange', () => { const h = (location.hash || '').replace('#', ''); if (/^[A-Z0-9]{5}$/.test(h) && h !== code && myName) openGame(h, true); });
 }
+document.body.insertAdjacentHTML('afterbegin', A.DEFS);
 bindGlobal();
 init();
 
