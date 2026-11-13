@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1d1a2f">
+<title>Il mio profilo · Tavolata</title>
+<meta name="description" content="Il tuo profilo su Tavolata: nome e foto usati in tutti i giochi, i tuoi amici e le statistiche di ogni gioco in una sola pagina.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='6' width='52' height='52' rx='12' fill='%23ffcf4a'/><circle cx='22' cy='22' r='5' fill='%231d1a2f'/><circle cx='42' cy='42' r='5' fill='%231d1a2f'/><circle cx='32' cy='32' r='5' fill='%231d1a2f'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#1d1a2f;--bg-2:#262240;--card:#2b2647;--card-hi:#342e56;--line:rgba(255,255,255,.09);--text:#f4f1ff;--muted:#a9a3c9;--yellow:#ffcf4a;--green:#3ddc84;--radius:22px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(520px 380px at 8% 0%,rgba(255,107,107,.16),transparent 70%),radial-gradient(560px 420px at 100% 10%,rgba(77,171,247,.14),transparent 70%),radial-gradient(620px 460px at 50% 110%,rgba(255,207,74,.1),transparent 70%),var(--bg)}
+  html,body{overflow-x:hidden}
+  .wrap{max-width:1020px;margin:0 auto;padding:0 18px 50px}
+  header{padding:24px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+  .brand-mark{width:40px;height:40px;border-radius:12px;background:var(--yellow);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:7px;transform:rotate(-8deg);box-shadow:0 5px 0 #c99a17}
+  .brand-mark i{width:6px;height:6px;border-radius:50%;background:var(--bg);place-self:center}
+  .brand-mark i:nth-child(2n){visibility:hidden}
+  .brand-name{font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.5rem}
+  h1,h2{font-family:"Fredoka",sans-serif;font-weight:600}
+  h1{font-size:clamp(1.8rem,5vw,2.6rem);line-height:1.1}
+  h2{font-size:1.35rem;margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:16px}
+  .mut{color:var(--muted)}.small{font-size:.9rem}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .me{display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center}
+  .bigav{position:relative}
+  .bigav .tv-av{box-shadow:0 0 0 4px var(--bg-2),0 0 0 6px rgba(255,255,255,.15)}
+  .lbl{font-size:.8rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+  .emo{display:flex;flex-wrap:wrap;gap:6px}
+  .emo button{font-size:22px;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer}
+  .emo button.on,.cols button.on{outline:2px solid var(--yellow);outline-offset:2px}
+  .cols{display:flex;gap:8px;flex-wrap:wrap}
+  .cols button{width:30px;height:30px;border-radius:50%;border:2px solid rgba(0,0,0,.25);cursor:pointer}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .tile{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+  .tile b{display:block;font-family:"Fredoka",sans-serif;font-size:1.7rem;line-height:1.1}
+  .tile span{color:var(--muted);font-size:.85rem;font-weight:700}
+  .ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:14px;margin-top:14px}
+  .gc{--accent:#888;background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 20%,var(--card)),var(--card) 60%);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+  .gc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .gc h3{font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.15rem;display:flex;align-items:center;gap:8px}
+  .gc .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+  .gc .nums div{background:rgba(0,0,0,.18);border-radius:10px;padding:6px 4px}
+  .gc .nums b{display:block;font-family:"Fredoka",sans-serif;font-size:1.3rem}
+  .gc .nums span{font-size:.75rem;color:var(--muted);font-weight:700}
+  .gc .x{display:flex;justify-content:space-between;font-size:.9rem;gap:8px}.gc .x b{white-space:nowrap}
+  .gc a{color:var(--accent);font-weight:800;font-size:.9rem;text-decoration:none;margin-top:auto}
+  .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+  .nogames{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .nogames a{font-size:.88rem;font-weight:700;color:var(--muted);text-decoration:none;border:1px dashed rgba(255,255,255,.18);border-radius:99px;padding:5px 12px}
+  .nogames a:hover{color:var(--text)}
+  .recent{display:flex;flex-direction:column;gap:6px}
+  .recent .r{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+  .recent .r .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px;flex:none}
+  .recent .r .t{flex:1;min-width:0}.recent .r small{color:var(--muted)}
+  .res{font-weight:800;white-space:nowrap}.res.win{color:var(--green)}
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+  @media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.me{grid-template-columns:minmax(0,1fr);justify-items:start}}
+  .warn{color:#ffb4b4}
+</style>
+</head>
+<body data-tv-pagina="profilo">
+<div class="wrap">
+  <header>
+    <a class="brand" href="../" aria-label="Tavolata, tutti i giochi"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="brand-name">Tavolata</span></a>
+    <div class="row"><a class="tv-btn" id="hub" href="../">🎲 Tutti i giochi</a><button class="tv-btn" data-tv="conto">👥 Amici</button></div>
+  </header>
+  <main id="pagina"><div class="card mut">Caricamento…</div></main>
+</div>
+
+<script src="../comune/mqtt.min.js"></script>
+<script src="../comune/tavolata.js"></script>
+<script>
+'use strict';
+const T = window.Tavolata, esc = T.esc;
+const $ = s => document.querySelector(s);
+const hub = $('#hub'); hub.href = '../' + T.QS;
+
+/* ---------------- quale profilo mostrare ---------------- */
+function quale() {
+  const h = decodeURIComponent((location.hash || '').slice(1));
+  if (h.startsWith('collega=')) return { collega: h.slice(8) };
+  const id = T.idDaCodice(h);
+  if (id && id !== T.id) return { amico: id };
+  return { mio: true };
+}
+
+function pct(v, n) { return n ? Math.round(v / n * 100) : 0; }
+function giocoCard(g, r, link) {
+  const perc = pct(r.v, r.a);
+  return `<div class="gc" style="--accent:${g.colore}">
+    <h3><span>${g.ico}</span>${esc(g.nome)}</h3>
+    <div class="nums"><div><b>${r.p}</b><span>partite</span></div><div><b>${r.v}</b><span>vittorie</span></div><div><b>${r.a ? perc + '%' : '–'}</b><span>vinte con altri</span></div></div>
+    ${r.a ? `<div class="bar" title="${perc}% di vittorie"><i style="width:${perc}%"></i></div>` : ''}
+    ${(r.x || []).map(([l, v]) => `<div class="x"><span class="mut">${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}
+    <div class="x"><span class="mut">🕒 Ultima partita</span><b>${r.u ? esc(T.quando(r.u)) : '–'}</b></div>
+    ${link ? `<a href="../${g.id}/${T.QS}">Tutte le statistiche e gioca →</a>` : ''}
+  </div>`;
+}
+function statsHTML(giochi, mio) {
+  const usati = T.GIOCHI.filter(g => giochi[g.id]);
+  const tot = usati.reduce((a, g) => a + giochi[g.id].p, 0);
+  const vin = usati.reduce((a, g) => a + giochi[g.id].v, 0);
+  const con = usati.reduce((a, g) => a + giochi[g.id].a, 0);
+  const pref = usati.slice().sort((a, b) => giochi[b.id].p - giochi[a.id].p)[0];
+  if (!usati.length) return `<div class="mut">${mio ? 'Ancora nessuna partita conclusa. Finisci una partita in un gioco qualsiasi e qui trovi le statistiche di tutti i giochi insieme.' : 'Ancora nessuna partita conclusa (o le statistiche non sono ancora arrivate).'}</div>`;
+  const ord = usati.sort((a, b) => (giochi[b.id].u || 0) - (giochi[a.id].u || 0));
+  return `<div class="tiles">
+      <div class="tile"><b>${tot}</b><span>partite in tutto</span></div>
+      <div class="tile"><b>${vin}</b><span>vittorie</span></div>
+      <div class="tile"><b>${con ? pct(vin, con) + '%' : '–'}</b><span>vinte con altri</span></div>
+      <div class="tile"><b>${usati.length}/${T.GIOCHI.length}</b><span>giochi provati</span></div>
+      ${pref ? `<div class="tile"><b>${pref.ico}</b><span>preferito: ${esc(pref.nome)}</span></div>` : ''}
+    </div>
+    <div class="ggrid">${ord.map(g => giocoCard(g, giochi[g.id], mio)).join('')}</div>
+    ${mio && usati.length < T.GIOCHI.length ? `<div class="lbl" style="margin-top:18px">Ancora da provare</div><div class="nogames">${T.GIOCHI.filter(g => !giochi[g.id]).map(g => `<a href="../${g.id}/${T.QS}">${g.ico} ${esc(g.nome)}</a>`).join('')}</div>` : ''}`;
+}
+function esito(r) {
+  if (r.removed) return ['Disconnesso', ''];
+  if (r.won || r.champ || (r.place === 1 && r.n > 1)) return ['Vittoria!', 'win'];
+  if (r.n === 1) return ['Da solo', ''];
+  const pos = r.pos || r.place || r.rank;
+  if (pos) return [pos + '° posto', ''];
+  if (r.draw) return ['Pareggio', ''];
+  return ['Persa', ''];
+}
+function recentiHTML() {
+  const nomi = T.conto().nomi;
+  const tutte = [];
+  T.GIOCHI.forEach(g => T.partiteDi(g, nomi).slice(0, 12).forEach(r => tutte.push([g, r])));
+  tutte.sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+  if (!tutte.length) return '';
+  return `<div class="card"><h2>🕒 Ultime partite</h2><div class="recent">${tutte.slice(0, 12).map(([g, r]) => { const [tx, cl] = esito(r); return `<div class="r"><div class="ic" style="background:${g.colore}33">${g.ico}</div><div class="t"><b>${esc(g.nome)}</b><br><small>${new Date(r.t).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${r.n ? ' · ' + r.n + ' giocatori' : ''}${r.winner && !r.won ? ' · ha vinto ' + esc(r.winner) : ''}</small></div><span class="res ${cl}">${tx}</span></div>`; }).join('')}</div></div>`;
+}
+
+/* ---------------- il mio profilo ---------------- */
+let emoAperte = false;
+function renderMio() {
+  const c = T.conto();
+  const sc = scrollY;
+  const nmFocus = document.activeElement && document.activeElement.id === 'pnome';
+  const nmVal = nmFocus ? $('#pnome').value : null;
+  const giochi = T.riepilogoLocale();
+  const amici = T.amici(), ric = T.richieste(), usc = T.uscite();
+  $('#pagina').innerHTML = `
+  <h1 style="margin:12px 0 4px">Il mio profilo</h1>
+  <p class="mut">Nome e immagine valgono in tutti i giochi. Qui trovi anche gli amici e le statistiche di ogni gioco.</p>
+  <div class="card me">
+    <div class="bigav">${T.avatarHTML(T.id, 112)}</div>
+    <div style="min-width:0;width:100%">
+      <div class="lbl" style="margin-top:0">Il tuo nome</div>
+      <div class="row"><input id="pnome" class="tv-in" maxlength="16" placeholder="Come ti chiami?" value="${esc(nmVal != null ? nmVal : c.nome)}" style="flex:1;min-width:180px;max-width:320px"><button class="tv-btn tv-pri" id="psalva">Salva</button><span id="pok" class="small mut"></span></div>
+      <div class="lbl">Immagine</div>
+      <div class="row">
+        <label class="tv-btn" style="cursor:pointer">📷 ${c.foto ? 'Cambia foto' : 'Carica una foto'}<input type="file" id="pfoto" accept="image/*" hidden></label>
+        <button class="tv-btn" id="pemo">😀 ${c.emoji ? 'Cambia emoji' : 'Usa un\'emoji'}</button>
+        ${c.foto || c.emoji ? '<button class="tv-btn tv-gh" id="ptogli">Usa l\'iniziale</button>' : ''}
+      </div>
+      <div id="emobox" ${emoAperte ? '' : 'hidden'}><div class="emo" style="margin-top:10px">${T.EMOJI.map(e => `<button data-emo="${e}" class="${c.emoji === e ? 'on' : ''}" aria-label="${e}">${e}</button>`).join('')}</div></div>
+      <div class="lbl">Colore di sfondo</div>
+      <div class="cols">${T.COLORI.map(k => `<button data-col="${k}" class="${c.colore === k ? 'on' : ''}" style="background:${k}" aria-label="Colore ${k}"></button>`).join('')}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Le mie statistiche</h2>
+    ${statsHTML(giochi, true)}
+    <p class="small mut" style="margin-top:14px">Contano le partite giocate con ${c.nomi.length > 1 ? 'i nomi ' + c.nomi.map(n => '<b>' + esc(n) + '</b>').join(', ') : 'il nome <b>' + esc(c.nome || '…') + '</b>'}, su tutti i dispositivi collegati a questo account.</p>
+  </div>
+  ${recentiHTML()}
+
+  <div class="two">
+    <div class="card">
+      <h2>👥 Amici <span class="small mut">${amici.filter(a => a.online).length} online su ${amici.length}</span></h2>
+      <div class="small mut">Il tuo codice amico</div>
+      <div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="tv-codice">${c.codice}</span><span class="row"><button class="tv-btn tv-sm" data-tv="copia" data-txt="${c.codice}" data-ok="Codice copiato">Copia codice</button><button class="tv-btn tv-sm" data-tv="copia" data-txt="${esc(T.BASE + 'profilo/#' + T.id.slice(2))}" data-ok="Link copiato: chi lo apre può aggiungerti">Copia link</button></span></div>
+      ${ric.length ? `<div class="lbl">Richieste per te</div><div class="tv-list">${ric.map(m => `<div class="tv-item">${T.avatarHTML(m.da, 36)}<div class="tv-tx"><b>${esc((T.profiloDi(m.da) || m).nome)}</b><small>${esc(T.quando(m.t))}</small></div><button class="tv-btn tv-sm tv-gh" data-tv="no-am" data-id="${m.da}">No</button><button class="tv-btn tv-sm tv-ok" data-tv="si-am" data-id="${m.da}">Accetta</button></div>`).join('')}</div>` : ''}
+      ${amici.length ? `<div class="tv-list">${amici.map(a => `<div class="tv-item">${T.avatarHTML(a.id, 38, true)}<div class="tv-tx"><b>${esc(a.nome)}</b><small class="${a.online ? 'tv-on' : ''}">${esc(a.stato.txt)}</small></div>${a.stato.stanza ? `<button class="tv-btn tv-sm tv-pri" data-tv="unisciti" data-g="${esc(a.stato.stanza.gioco)}" data-c="${esc(a.stato.stanza.code)}">Unisciti</button>` : ''}<a class="tv-btn tv-sm" href="#${a.id.slice(2)}">Profilo</a><button class="tv-btn tv-sm tv-gh" data-tv="rimuovi" data-id="${a.id}" title="Togli dagli amici">✕</button></div>`).join('')}</div>` : '<div class="mut small">Ancora nessun amico. Manda il tuo codice, oppure aggiungi quello di un amico.</div>'}
+      <div class="lbl">Aggiungi un amico</div>
+      <div class="row" style="flex-wrap:nowrap"><input id="tv-codice-in" class="tv-in" style="flex:1;min-width:0;text-transform:uppercase;letter-spacing:1px" maxlength="20" placeholder="Codice amico (ABCD-EF23)"><button class="tv-btn tv-pri" data-tv="agg-codice">Aggiungi</button></div>
+      <div id="tv-codice-esito" class="small mut" style="margin-top:6px"></div>
+      ${usc.length ? `<div class="tv-list">${usc.map(u => `<div class="tv-item">${T.avatarHTML(u.id, 32)}<div class="tv-tx"><b>${esc((T.profiloDi(u.id) || {}).nome || T.codiceAmico(u.id))}</b><small>Richiesta mandata · in attesa</small></div><button class="tv-btn tv-sm tv-gh" data-tv="annulla" data-id="${u.id}">Annulla</button></div>`).join('')}</div>` : ''}
+    </div>
+    <div class="card">
+      <h2>📱 Altri dispositivi</h2>
+      <p class="small">Vuoi lo stesso account sul telefono e sul computer? Copia questo <b>link segreto</b> e aprilo sull'altro dispositivo (per esempio mandandotelo su WhatsApp): avrai lo stesso nome, gli stessi amici e le statistiche di tutti e due.</p>
+      <div class="row" style="margin-top:12px"><button class="tv-btn tv-pri" data-tv="copia" data-txt="${esc(T.linkDispositivo())}" data-ok="Link segreto copiato: aprilo sull'altro dispositivo">🔑 Copia il link segreto</button></div>
+      <p class="small warn" style="margin-top:10px">Non darlo agli amici: chi lo apre usa il tuo account. Agli amici dai il codice amico.</p>
+      <div class="lbl">Hai un link da un altro dispositivo?</div>
+      <div class="row" style="flex-wrap:nowrap"><input id="plink" class="tv-in" style="flex:1;min-width:0" placeholder="Incolla qui il link segreto"><button class="tv-btn" id="pcollega">Collega</button></div>
+      <div id="plinkok" class="small mut" style="margin-top:6px"></div>
+    </div>
+  </div>
+  <p class="small mut" style="margin-top:18px;text-align:center">${T.collegato() ? '🟢 Collegato' : '🟠 Mi sto collegando…'} · Account senza password: vive su questo dispositivo e su quelli che colleghi col link segreto.</p>`;
+  scrollTo(0, sc);
+  const pn = $('#pnome');
+  if (nmFocus) { pn.focus(); pn.setSelectionRange(pn.value.length, pn.value.length); }
+  const salva = () => { const v = pn.value.trim(); if (!v) { pn.focus(); return T.avviso('Scrivi il tuo nome'); } T.salvaProfilo({ nome: v }); T.avviso('✅ Nome salvato: lo vedranno in tutti i giochi'); };
+  $('#psalva').onclick = salva; pn.onkeydown = e => { if (e.key === 'Enter') salva(); };
+  $('#pfoto').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { T.salvaProfilo({ foto: await T.fotoDaFile(f) }); T.avviso('📷 Foto aggiornata'); } catch (er) { T.avviso(er.message || 'Immagine non valida'); } };
+  $('#pemo').onclick = () => { emoAperte = !emoAperte; $('#emobox').hidden = !emoAperte; };
+  const tg = $('#ptogli'); if (tg) tg.onclick = () => T.salvaProfilo({ foto: '', emoji: '' });
+  document.querySelectorAll('[data-emo]').forEach(b => b.onclick = () => { T.salvaProfilo({ emoji: b.dataset.emo }); emoAperte = false; });
+  document.querySelectorAll('[data-col]').forEach(b => b.onclick = () => T.salvaProfilo({ colore: b.dataset.col }));
+  const ci = $('#tv-codice-in'); ci.onkeydown = e => { if (e.key === 'Enter') document.querySelector('[data-tv="agg-codice"]').click(); };
+  $('#pcollega').onclick = () => chiediCollega($('#plink').value);
+}
+
+function chiediCollega(txt) {
+  T.conferma('Collegare questo dispositivo?', 'Questo dispositivo userà l\'account dell\'altro: stesso nome, stessi amici e statistiche unite. L\'account che c\'è adesso qui verrà lasciato.', 'Collega', () => {
+    const r = T.collegaDa(txt);
+    if (!r.ok) { const o = $('#plinkok'); if (o) o.textContent = r.msg; else T.avviso(r.msg); return; }
+    T.avviso(r.msg);
+    setTimeout(() => { location.replace(location.pathname + location.search); if (r.ricarica) location.reload(); }, 900);
+  });
+}
+
+/* ---------------- profilo di un'altra persona ---------------- */
+function renderAmico(id) {
+  T.seguiProfilo(id);
+  const p = T.profiloDi(id);
+  const ri = T.riepilogoDi(id);
+  const amico = T.eAmico(id), inAttesa = T.uscite().some(u => u.id === id), chiede = T.richieste().some(m => m.da === id);
+  const s = T.statoAmico(id);
+  $('#pagina').innerHTML = `
+  <p style="margin-top:10px"><a class="tv-btn tv-sm" href="#">← Il mio profilo</a></p>
+  <div class="card me">
+    <div class="bigav">${T.avatarHTML(id, 112, amico)}</div>
+    <div>
+      <h1>${p ? esc(p.nome) : 'Profilo'}</h1>
+      <div class="mut">Codice amico <b style="color:var(--yellow);letter-spacing:1px">${T.codiceAmico(id)}</b>${amico ? ` · <span class="${s.on ? 'tv-on' : ''}">${esc(s.txt)}</span>` : ''}</div>
+      ${!p ? '<p class="small mut" style="margin-top:8px">Cerco questa persona… se il codice è giusto, il profilo compare tra poco.</p>' : ''}
+      <div class="row" style="margin-top:14px">
+        ${amico ? `<span class="tv-on" style="font-weight:800">✓ Siete amici</span>${s.stanza ? `<button class="tv-btn tv-pri" data-tv="unisciti" data-g="${esc(s.stanza.gioco)}" data-c="${esc(s.stanza.code)}">Unisciti alla sua stanza</button>` : ''}<button class="tv-btn tv-gh" data-tv="rimuovi" data-id="${id}">Togli dagli amici</button>`
+        : chiede ? `<button class="tv-btn tv-ok" data-tv="si-am" data-id="${id}">Accetta l'amicizia</button><button class="tv-btn tv-gh" data-tv="no-am" data-id="${id}">Rifiuta</button>`
+        : inAttesa ? `<span class="mut">Richiesta mandata: aspetta che la accetti</span><button class="tv-btn tv-gh" data-tv="annulla" data-id="${id}">Annulla</button>`
+        : `<button class="tv-btn tv-pri" data-tv="aggiungi" data-id="${id}">➕ Aggiungi agli amici</button>`}
+      </div>
+    </div>
+  </div>
+  <div class="card"><h2>📊 Statistiche</h2>${ri && ri.giochi ? statsHTML(ri.giochi, false) + `<p class="small mut" style="margin-top:12px">Aggiornate ${esc(T.quando(ri.t))}.</p>` : '<div class="mut">Le statistiche arrivano appena questa persona apre la sala giochi.</div>'}</div>`;
+}
+
+/* ---------------- disegno ---------------- */
+function render() {
+  const q = quale();
+  if (q.collega) { history.replaceState(null, '', location.pathname + location.search); renderMio(); chiediCollega(q.collega); return; }
+  if (q.amico) renderAmico(q.amico); else renderMio();
+}
+let t = null;
+const presto = () => { clearTimeout(t); t = setTimeout(() => { const a = document.activeElement; if (a && a.tagName === 'INPUT' && a.value && a.id !== 'pnome') return; render(); }, 120); };
+['profilo', 'profili', 'amici', 'stats', 'riepilogo', 'presenza', 'posta'].forEach(e => addEventListener('tavolata:' + e, presto));
+addEventListener('hashchange', () => { render(); scrollTo(0, 0); });
+setInterval(presto, 15000);
+render();
+</script>
+</body>
+</html>
