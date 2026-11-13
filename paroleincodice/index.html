@@ -404,6 +404,21 @@ textarea{width:100%;min-height:90px;resize:vertical;font-size:.9rem}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 </style>
+<style id="chat-toggle-css">
+/* 💬 Chat: si apre e si chiude col pulsante anche sugli schermi grandi */
+@media (min-width:901px){
+  #side:not(.open){display:none!important}
+    .layout.chat-chiusa{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (min-width:901px){
+  .layout:has(#side:not(.open)){grid-template-columns:minmax(0,1fr)!important}
+}
+</style>
+<script>
+/* 💬 Chat: aperta di default sugli schermi grandi, chiusa sul telefono; la scelta viene ricordata */
+var CHAT_BP = 900;
+function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return localStorage.getItem('tavolata-chat') !== 'chiusa'; } catch (e) { return true; } }
+</script>
 </head>
 <body class="v-home">
 <div id="app"></div>
@@ -1160,7 +1175,7 @@ const lastSeen = {}, presT = {}, presVis = {};
 let hbTimer = null, dutyTimer = null, uiTick = null, openedAt = 0, dutyReadyAt = 0, lastTick = 0, freezeAt = 0;
 let builtKey = '', meKey = '', lastEventN = -1, resultsReadyAt = 0, resultsTimer = null;
 let clueFreshUntil = 0, prevCov = null, lastClueK = 0, myMark = null, pickSel = -1, drag = null, suppressClick = 0;
-let tab = 'all', seen = { all: 0, team: 0 }, sideOpen = false, feedKey = '';
+let tab = 'all', seen = { all: 0, team: 0 }, sideOpen = chatAperta(), feedKey = '';
 let showKey = ls.get('pc-showkey') !== '0', showWords = false;
 
 /* =========================================================
@@ -1327,7 +1342,7 @@ function closeGame() {
   clearInterval(hbTimer); clearInterval(dutyTimer); clearInterval(uiTick); clearTimeout(resultsTimer);
   S = null; serverS = null; seats = []; chat = []; marks = {}; code = null; inflight = 0; writeChain = Promise.resolve();
   builtKey = ''; meKey = ''; feedKey = ''; lastEventN = -1; prevCov = null; lastClueK = 0; myMark = null; pickSel = -1;
-  seen = { all: 0, team: 0 }; tab = 'all'; sideOpen = false;
+  seen = { all: 0, team: 0 }; tab = 'all'; sideOpen = chatAperta();
   endDrag();
   for (const o of [lastSeen, presT, presVis]) for (const k in o) delete o[k];
   hideModal(); hideInfo();
@@ -1750,7 +1765,7 @@ function buildGameUI() {
         <div class="gridwrap" id="gridwrap"><div class="grid" id="grid"></div></div>
         <div class="me" id="mebox"></div>
       </div>
-      <aside class="side" id="side">
+      <aside class="side${sideOpen ? ' open' : ''}" id="side">
         <div class="tabs" id="tabs"></div>
         <div class="feed" id="feed"></div>
         <div class="chatnote" id="chatnote" hidden></div>
@@ -2134,7 +2149,7 @@ function renderTabs() {
 function chatOf(ch) { return chat.filter(m => (m.ch || 'all') === ch); }
 function unread() {
   const t = myTeamChat();
-  const narrow = window.innerWidth <= 900;
+  const narrow = true /* chat a scomparsa su ogni schermo */;
   const vis = k => (!narrow || sideOpen) && tab === k;
   const all = vis('all') ? 0 : chatOf('all').filter(m => m.t > seen.all && m.id !== myId).length;
   const team = !t || vis('team') ? 0 : chatOf(t).filter(m => m.t > seen.team && m.id !== myId).length;
@@ -2155,7 +2170,7 @@ function renderFeed() {
   if (tab === 'all') items = G.log.slice(-90).map(l => ({ t: l.t || 0, html: `<div class="msg ${l.kind || ''}">${esc(l.msg)}</div>` }));
   items = items.concat(msgs).sort((a, b) => a.t - b.t);
   k += ':' + items.length + ':' + (items.length ? items[items.length - 1].t : 0) + ':' + G.logSeq;
-  const narrow = window.innerWidth <= 900;
+  const narrow = true /* chat a scomparsa su ogni schermo */;
   if (!narrow || sideOpen) { const last = msgs.length ? msgs[msgs.length - 1].t : 0; if (tab === 'all') seen.all = Math.max(seen.all, last); else seen.team = Math.max(seen.team, last); }
   if (k === feedKey) return; feedKey = k;
   const near = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
@@ -2173,7 +2188,7 @@ function onChat() {
   if (!S || view !== 'game' || S.status === 'lobby') return;
   renderFeed(); renderTabs();
   const last = chat[chat.length - 1];
-  const narrow = window.innerWidth <= 900;
+  const narrow = true /* chat a scomparsa su ogni schermo */;
   if (last && last.id !== myId && narrow && !sideOpen && last.t > (onChat.lastToast || 0) && Date.now() - last.t < 8000) {
     const t = myTeamChat();
     if ((last.ch || 'all') === 'all' || last.ch === t) { onChat.lastToast = last.t; toast(`💬 ${last.by}: ${last.x}`, last.ch && last.ch !== 'all' ? last.ch : ''); }
@@ -2183,7 +2198,7 @@ function onChat() {
 function updBadge() {
   const b = $('#chatBadge'); if (!b) return;
   const u = unread(); const n = u.all + u.team;
-  b.hidden = !n || window.innerWidth > 900; b.textContent = n;
+  b.hidden = !n; b.textContent = n;
 }
 function sendChat(x) {
   if (!x || !code) return;
@@ -2408,6 +2423,37 @@ bindGlobal();
 init();
 window.__pic = { get S() { return S; }, get myId() { return myId; }, get marks() { return marks; }, E, gameAct, act, dutyId, isPresent };
 
+</script>
+<script>
+/* 💬 Chat: il pulsante apre e chiude il pannello su ogni schermo */
+(function () {
+  var SEL = '#chatToggle,#bSide,#chatBtn,#bSideX';
+  var wide = function () { return innerWidth > CHAT_BP; }, was = wide();
+  function aperta() { try { return !!sideOpen; } catch (e) { return true; } }
+  function sync() {
+    var open = aperta();
+    var L = document.querySelector('.layout'); if (L) L.classList.toggle('chat-chiusa', !open);
+    var x = document.getElementById('bSideX'); if (x) x.hidden = !open;
+    document.querySelectorAll('#chatToggle,#bSide,#chatBtn').forEach(function (b) {
+      b.setAttribute('aria-pressed', open ? 'true' : 'false');
+      b.title = open ? 'Nascondi la chat' : 'Mostra la chat';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest(SEL)) return;
+    if (wide()) { try { localStorage.setItem('tavolata-chat', aperta() ? 'aperta' : 'chiusa'); } catch (er) {} }
+    sync();
+    if (wide()) dispatchEvent(new Event('resize'));
+  });
+  addEventListener('resize', function () {
+    var w = wide(); if (w === was) return; was = w;
+    try { sideOpen = chatAperta(); } catch (e) { return; }
+    var s = document.getElementById('side'); if (s) s.classList.toggle('open', sideOpen);
+    sync();
+  });
+  new MutationObserver(function () { if (document.getElementById('side')) sync(); }).observe(document.getElementById('app') || document.body, { childList: true });
+  sync();
+})();
 </script>
 </body>
 </html>

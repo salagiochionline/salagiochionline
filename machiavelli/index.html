@@ -315,6 +315,21 @@ input:focus,select:focus{outline:2px solid var(--violet);outline-offset:1px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<style id="chat-toggle-css">
+/* 💬 Chat: si apre e si chiude col pulsante anche sugli schermi grandi */
+@media (min-width:901px){
+  #side:not(.open){display:none!important}
+    .layout.chat-chiusa{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (min-width:901px){
+  .layout:has(#side:not(.open)){grid-template-columns:minmax(0,1fr)!important}
+}
+</style>
+<script>
+/* 💬 Chat: aperta di default sugli schermi grandi, chiusa sul telefono; la scelta viene ricordata */
+var CHAT_BP = 900;
+function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return localStorage.getItem('tavolata-chat') !== 'chiusa'; } catch (e) { return true; } }
+</script>
 </head>
 <body class="v-home">
 <div id="app"></div>
@@ -1287,7 +1302,7 @@ let hbTimer = null, dutyTimer = null, uiTick = null, openedAt = 0;
 let gameKey = '', builtKey = '';
 let lastEventN = 0, resultsReadyAt = 0, resultsTimer = null;
 let botTimer = null, botFor = '';
-let feedKey = '', chatSeenT = 0, sideOpen = false;
+let feedKey = '', chatSeenT = 0, sideOpen = chatAperta();
 let WS = null;            // il mio "banco di lavoro" durante il turno
 let drag = null, suppressClick = 0, pendingRender = false, draftTimer = null, lastDraftSent = '';
 
@@ -2115,7 +2130,7 @@ function onChat() {
   if (!S || view !== 'game' || S.status === 'lobby') return;
   renderFeed();
   const last = chat[chat.length - 1];
-  const narrow = window.innerWidth <= 900;
+  const narrow = true /* chat a scomparsa su ogni schermo */;
   if (last && last.t > chatSeenT) {
     if (narrow && !sideOpen && last.id !== myId) toast(`💬 ${last.by}: ${last.x}`);
     if (!narrow || sideOpen) chatSeenT = last.t;
@@ -2125,7 +2140,7 @@ function onChat() {
 function updBadge() {
   const b = $('#chatBadge'); if (!b) return;
   const unread = chat.filter(m => m.t > chatSeenT && m.id !== myId).length;
-  b.hidden = !unread || (window.innerWidth > 900); b.textContent = unread;
+  b.hidden = !unread; b.textContent = unread;
 }
 function sendChat(x) {
   if (!x || !code) return;
@@ -2422,6 +2437,37 @@ function bindGlobal() {
 bindGlobal();
 init();
 window.__mach = { get S() { return S; }, get WS() { return WS; }, get myId() { return myId; }, E, B, gameAct, act, moveCards, commitTurn };
+</script>
+<script>
+/* 💬 Chat: il pulsante apre e chiude il pannello su ogni schermo */
+(function () {
+  var SEL = '#chatToggle,#bSide,#chatBtn,#bSideX';
+  var wide = function () { return innerWidth > CHAT_BP; }, was = wide();
+  function aperta() { try { return !!sideOpen; } catch (e) { return true; } }
+  function sync() {
+    var open = aperta();
+    var L = document.querySelector('.layout'); if (L) L.classList.toggle('chat-chiusa', !open);
+    var x = document.getElementById('bSideX'); if (x) x.hidden = !open;
+    document.querySelectorAll('#chatToggle,#bSide,#chatBtn').forEach(function (b) {
+      b.setAttribute('aria-pressed', open ? 'true' : 'false');
+      b.title = open ? 'Nascondi la chat' : 'Mostra la chat';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest(SEL)) return;
+    if (wide()) { try { localStorage.setItem('tavolata-chat', aperta() ? 'aperta' : 'chiusa'); } catch (er) {} }
+    sync();
+    if (wide()) dispatchEvent(new Event('resize'));
+  });
+  addEventListener('resize', function () {
+    var w = wide(); if (w === was) return; was = w;
+    try { sideOpen = chatAperta(); } catch (e) { return; }
+    var s = document.getElementById('side'); if (s) s.classList.toggle('open', sideOpen);
+    sync();
+  });
+  new MutationObserver(function () { if (document.getElementById('side')) sync(); }).observe(document.getElementById('app') || document.body, { childList: true });
+  sync();
+})();
 </script>
 </body>
 </html>

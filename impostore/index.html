@@ -320,6 +320,21 @@ textarea{width:100%;min-height:90px;resize:vertical}
 .card.mini .card-b small{font-size:.7rem}
 
 </style>
+<style id="chat-toggle-css">
+/* 💬 Chat: si apre e si chiude col pulsante anche sugli schermi grandi */
+@media (min-width:901px){
+  #side:not(.open){display:none!important}
+    .layout.chat-chiusa{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (min-width:901px){
+  .layout:has(#side:not(.open)){grid-template-columns:minmax(0,1fr)!important}
+}
+</style>
+<script>
+/* 💬 Chat: aperta di default sugli schermi grandi, chiusa sul telefono; la scelta viene ricordata */
+var CHAT_BP = 900;
+function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return localStorage.getItem('tavolata-chat') !== 'chiusa'; } catch (e) { return true; } }
+</script>
 </head>
 <body class="v-home">
 <div id="app"></div>
@@ -1342,7 +1357,7 @@ const lastSeen = {}, lastVis = {}, presT = {};
 let hbTimer = null, dutyTimer = null, uiTick = null, openedAt = 0, visibleSince = Date.now();
 let builtKey = '', lastEventN = -1, evKey = '';
 let resultsReadyAt = 0, resultsTimer = null, processing = false;
-let feedKey = '', bookKey = '', chatSeenT = 0, sideOpen = false, sideTab = 'clues';
+let feedKey = '', bookKey = '', chatSeenT = 0, sideOpen = chatAperta(), sideTab = 'clues';
 let sentFor = {}, viewTable = '', cardShown = '', cardHidden = false, voteSel = null, revealAt = 0, revealCounts = null, roleFlash = null;
 const myCards = {}, verRes = {}, jobs = {}, keyOk = new Map();
 
@@ -1967,8 +1982,8 @@ function buildGameUI() {
         <div class="tablewrap" id="twrap"><div class="ring" id="ring"></div><div class="center" id="center"></div></div>
         <div class="bar" id="bar"></div>
       </div>
-      <aside class="side" id="side">
-        <div class="side-head"><div class="tabs"><button class="btn sm" data-tab="clues">📝 Indizi</button><button class="btn sm" data-tab="chat">💬 Chat</button></div><button class="btn ghost sm" id="bSideX" hidden>✕</button></div>
+      <aside class="side${sideOpen ? ' open' : ''}" id="side">
+        <div class="side-head"><div class="tabs"><button class="btn sm" data-tab="clues">📝 Indizi</button><button class="btn sm" data-tab="chat">💬 Chat</button></div><button class="btn ghost sm" id="bSideX" ${sideOpen ? '' : 'hidden'}>✕</button></div>
         <div class="cluebook" id="book"></div>
         <div class="feed" id="feed" hidden></div>
         <form class="chatform" id="chatf"><input id="chatin" maxlength="200" placeholder="Scrivi in chat…" autocomplete="off"><button class="btn sm primary">Invia</button></form>
@@ -1977,7 +1992,7 @@ function buildGameUI() {
     <datalist id="allwords"></datalist>`;
   $('#bRules').onclick = () => showInfo(rulesHTML());
   $('#bExit').onclick = () => showInfo(`<h2>Uscire dalla partita?</h2><p>${S.status === 'playing' && amIn() ? 'Se esci, quando servirà il tuo turno la partita ti aspetterà per il tempo scelto, poi sarai fuori e la manche verrà annullata. Puoi rientrare con lo stesso link.' : 'Puoi rientrare con lo stesso link.'}</p><div class="mbtns"><button class="btn" data-close-info>Resta</button><button class="btn warn" id="exok">Esci</button></div>`, m => { $('#exok', m).onclick = () => { hideInfo(); leave(); }; });
-  const toggleSide = v => { sideOpen = v; $('#side').classList.toggle('open', v); $('#bSideX').hidden = !v || innerWidth > 900; if (v && sideTab === 'chat') { const last = chat[chat.length - 1]; if (last) chatSeenT = last.t; updBadge(); } };
+  const toggleSide = v => { sideOpen = v; $('#side').classList.toggle('open', v); $('#bSideX').hidden = !v; if (v && sideTab === 'chat') { const last = chat[chat.length - 1]; if (last) chatSeenT = last.t; updBadge(); } };
   $('#bSide').onclick = () => toggleSide(!sideOpen); $('#bSideX').onclick = () => toggleSide(false);
   $$('[data-tab]').forEach(b => b.onclick = () => { sideTab = b.dataset.tab; renderSide(); if (sideTab === 'chat') { const last = chat[chat.length - 1]; if (last) chatSeenT = last.t; updBadge(); } });
   $('#chatf').onsubmit = e => { e.preventDefault(); const x = $('#chatin').value.trim(); if (x) { sendChat(x); $('#chatin').value = ''; } };
@@ -2384,7 +2399,7 @@ function renderFeed() {
 function onChat() {
   if (!S || view !== 'game' || S.status === 'lobby') return;
   renderFeed();
-  const last = chat[chat.length - 1], narrow = window.innerWidth <= 900, seen = sideTab === 'chat' && (!narrow || sideOpen);
+  const last = chat[chat.length - 1], narrow = true /* chat a scomparsa su ogni schermo */, seen = sideTab === 'chat' && (!narrow || sideOpen);
   if (last && last.t > chatSeenT) {
     if (!seen && last.id !== myId) toast(`💬 ${last.by}: ${last.x}`);
     if (seen) chatSeenT = last.t;
@@ -2441,6 +2456,37 @@ function bindGlobal() {
 bindGlobal();
 init();
 
+</script>
+<script>
+/* 💬 Chat: il pulsante apre e chiude il pannello su ogni schermo */
+(function () {
+  var SEL = '#chatToggle,#bSide,#chatBtn,#bSideX';
+  var wide = function () { return innerWidth > CHAT_BP; }, was = wide();
+  function aperta() { try { return !!sideOpen; } catch (e) { return true; } }
+  function sync() {
+    var open = aperta();
+    var L = document.querySelector('.layout'); if (L) L.classList.toggle('chat-chiusa', !open);
+    var x = document.getElementById('bSideX'); if (x) x.hidden = !open;
+    document.querySelectorAll('#chatToggle,#bSide,#chatBtn').forEach(function (b) {
+      b.setAttribute('aria-pressed', open ? 'true' : 'false');
+      b.title = open ? 'Nascondi la chat' : 'Mostra la chat';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest(SEL)) return;
+    if (wide()) { try { localStorage.setItem('tavolata-chat', aperta() ? 'aperta' : 'chiusa'); } catch (er) {} }
+    sync();
+    if (wide()) dispatchEvent(new Event('resize'));
+  });
+  addEventListener('resize', function () {
+    var w = wide(); if (w === was) return; was = w;
+    try { sideOpen = chatAperta(); } catch (e) { return; }
+    var s = document.getElementById('side'); if (s) s.classList.toggle('open', sideOpen);
+    sync();
+  });
+  new MutationObserver(function () { if (document.getElementById('side')) sync(); }).observe(document.getElementById('app') || document.body, { childList: true });
+  sync();
+})();
 </script>
 </body>
 </html>

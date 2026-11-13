@@ -328,6 +328,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<style id="chat-toggle-css">
+/* 💬 Chat: si apre e si chiude col pulsante anche sugli schermi grandi */
+@media (min-width:901px){
+  #side:not(.open){display:none!important}
+    .layout.chat-chiusa{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (min-width:901px){
+  .layout:has(#side:not(.open)){grid-template-columns:minmax(0,1fr)!important}
+}
+</style>
+<script>
+/* 💬 Chat: aperta di default sugli schermi grandi, chiusa sul telefono; la scelta viene ricordata */
+var CHAT_BP = 900;
+function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return localStorage.getItem('tavolata-chat') !== 'chiusa'; } catch (e) { return true; } }
+</script>
 </head>
 <body class="v-home">
 <div id="app"></div>
@@ -1492,7 +1507,7 @@ const lastSeen = {}, lastVis = {}, presT = {};
 let hbTimer = null, dutyTimer = null, uiTick = null, openedAt = 0, visibleSince = Date.now();
 let builtKey = '', lastEventN = -1, evKey = '';
 let resultsReadyAt = 0, resultsTimer = null, processing = false, botTimer = null, botKey = '';
-let feedKey = '', chatSeenT = 0, sideOpen = false;
+let feedKey = '', chatSeenT = 0, sideOpen = chatAperta();
 let sentFor = {}, viewTable = '', ov = null, lifted = null, goLocal = {}, outbox = [], bubbles = {};
 const myHands = {}, verRes = {}, jobs = {}, keyOk = new Map();
 let tOff = null; // differenza tra il mio orologio e quello della regia (per i tempi della partita)
@@ -2217,8 +2232,8 @@ function buildGameUI() {
         </div>
         <div class="bar" id="bar"></div>
       </div>
-      <aside class="side" id="side">
-        <div class="side-head"><span>📖 Diario e chat</span><button class="btn ghost sm" id="bSideX" hidden>✕</button></div>
+      <aside class="side${sideOpen ? ' open' : ''}" id="side">
+        <div class="side-head"><span>📖 Diario e chat</span><button class="btn ghost sm" id="bSideX" ${sideOpen ? '' : 'hidden'}>✕</button></div>
         <div class="feed" id="feed"></div>
         <form class="chatform" id="chatf"><input id="chatin" maxlength="200" placeholder="Scrivi in chat…" autocomplete="off"><button class="btn sm primary" id="chatgo">Invia</button>
           <div class="emobar">${EMOJI.map(x => `<button type="button" data-emo="${x}">${x}</button>`).join('')}</div><div class="emonote" id="emonote"></div></form>
@@ -2226,7 +2241,7 @@ function buildGameUI() {
     </div></div>`;
   $('#bRules').onclick = () => showInfo(rulesHTML());
   $('#bExit').onclick = () => showInfo(`<h2>Uscire dalla partita?</h2><p>${S.status === 'playing' && amIn() ? 'Se esci, quando servirai la partita ti aspetterà per il tempo scelto, poi le tue carte verranno messe da parte e al tuo posto giocherà un bot. Puoi rientrare con lo stesso link.' : 'Puoi rientrare con lo stesso link.'}</p><div class="mbtns"><button class="btn" data-close-info>Resta</button><button class="btn warn" id="exok">Esci</button></div>`, m => { $('#exok', m).onclick = () => { hideInfo(); leave(); }; });
-  const toggleSide = v => { sideOpen = v; $('#side').classList.toggle('open', v); $('#bSideX').hidden = !v || innerWidth > 900; if (v) { const last = chat[chat.length - 1]; if (last) chatSeenT = last.t; updBadge(); } };
+  const toggleSide = v => { sideOpen = v; $('#side').classList.toggle('open', v); $('#bSideX').hidden = !v; if (v) { const last = chat[chat.length - 1]; if (last) chatSeenT = last.t; updBadge(); } };
   $('#bSide').onclick = () => toggleSide(!sideOpen); $('#bSideX').onclick = () => toggleSide(false);
   $('#chatf').onsubmit = e => { e.preventDefault(); const x = $('#chatin').value.trim(); if (x && !emojiOnly()) { sendChat(x); $('#chatin').value = ''; } };
   $$('[data-emo]').forEach(b => b.onclick = () => sendChat(b.dataset.emo, true));
@@ -2672,7 +2687,7 @@ function renderFeed() {
 function onChat() {
   if (!S || view !== 'game' || S.status === 'lobby') return;
   renderFeed();
-  const last = chat[chat.length - 1], narrow = window.innerWidth <= 900, seen = !narrow || sideOpen;
+  const last = chat[chat.length - 1], narrow = true /* chat a scomparsa su ogni schermo */, seen = !narrow || sideOpen;
   if (last && last.t > chatSeenT) {
     if (!seen && last.id !== myId && !last.e) toast(`💬 ${last.by}: ${last.x}`);
     if (seen) chatSeenT = last.t;
@@ -2729,6 +2744,37 @@ function bindGlobal() {
 bindGlobal();
 init();
 
+</script>
+<script>
+/* 💬 Chat: il pulsante apre e chiude il pannello su ogni schermo */
+(function () {
+  var SEL = '#chatToggle,#bSide,#chatBtn,#bSideX';
+  var wide = function () { return innerWidth > CHAT_BP; }, was = wide();
+  function aperta() { try { return !!sideOpen; } catch (e) { return true; } }
+  function sync() {
+    var open = aperta();
+    var L = document.querySelector('.layout'); if (L) L.classList.toggle('chat-chiusa', !open);
+    var x = document.getElementById('bSideX'); if (x) x.hidden = !open;
+    document.querySelectorAll('#chatToggle,#bSide,#chatBtn').forEach(function (b) {
+      b.setAttribute('aria-pressed', open ? 'true' : 'false');
+      b.title = open ? 'Nascondi la chat' : 'Mostra la chat';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest(SEL)) return;
+    if (wide()) { try { localStorage.setItem('tavolata-chat', aperta() ? 'aperta' : 'chiusa'); } catch (er) {} }
+    sync();
+    if (wide()) dispatchEvent(new Event('resize'));
+  });
+  addEventListener('resize', function () {
+    var w = wide(); if (w === was) return; was = w;
+    try { sideOpen = chatAperta(); } catch (e) { return; }
+    var s = document.getElementById('side'); if (s) s.classList.toggle('open', sideOpen);
+    sync();
+  });
+  new MutationObserver(function () { if (document.getElementById('side')) sync(); }).observe(document.getElementById('app') || document.body, { childList: true });
+  sync();
+})();
 </script>
 </body>
 </html>
