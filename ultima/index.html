@@ -1474,7 +1474,7 @@ function renderHome(loading) {
   view = 'home';
   document.body.className = 'v-home';
   const p2p = MODE === 'p2p';
-  const recent = p2p || MODE === 'local' ? recentCodes() : [];
+  const recent = MODE === 'local' ? recentCodes() : [];   // online: "Le tue partite in corso" del modulo Tavolata
   const glist = recent.length ? recent.map(g => `<div class="gitem"><div class="code">${esc(g.code)}</div><div style="flex:1"><div>Partita di <b>${esc(g.hostName || 'qualcuno')}</b></div><div class="small mut">Aperta il ${new Date(g.t).toLocaleDateString('it-IT')}</div></div><button class="btn sm" data-open="${esc(g.code)}">Riprendi</button></div>`).join('') : '';
   $('#app').innerHTML = `<div class="home">
     ${HUB_URL ? `<div class="row"><a class="btn hubbtn" href="${esc(HUB_URL)}">🎲 Tutti i giochi</a></div>` : ''}

@@ -26,7 +26,7 @@
   const INVITO_MS = 20 * 60000;     // un invito vale 20 minuti
 
   const GIOCHI = [
-    { id: 'crazymonopolio', nome: 'Crazy Monopolio', colore: '#ffcf4a', ico: '🏠', stats: 'gm-stats', nomeK: 'gm-name' },
+    { id: 'crazymonopolio', nome: 'Crazy Monopolio', colore: '#ffcf4a', ico: '🏠', stats: 'gm-stats', nomeK: 'gm-name', tp: 'giramondo-xl/v1/' },
     { id: 'ultima', nome: 'Ultima!', colore: '#ff6b6b', ico: '🃏', stats: 'ul-stats', nomeK: 'ul-name' },
     { id: 'machiavelli', nome: 'Machiavelli', colore: '#4dabf7', ico: '♠️', stats: 'mv-stats', nomeK: 'mv-name' },
     { id: 'scala40', nome: 'Scala 40', colore: '#3ddc84', ico: '🂡', stats: 's40-stats', nomeK: 's40-name' },
@@ -162,7 +162,7 @@
     Net.c.on('close', () => { Net.ok = false; });
     Net.c.on('error', () => { });
     Net.c.on('message', (topic, payload) => {
-      if (!topic.startsWith(TP)) return;
+      if (!topic.startsWith(TP)) { try { corsoArrivo(topic, payload); } catch (e) { } return; }
       let d = null;
       if (payload && payload.length) { try { d = JSON.parse(payload.toString()); } catch (e) { return; } }
       try { arrivo(topic.slice(TP.length), d); } catch (e) { console.warn('tavolata', e); }
@@ -490,6 +490,79 @@
   }
 
   /* =========================================================
+     PARTITE IN CORSO: nella home di ogni gioco, per rientrare
+     se ci si è disconnessi o si è chiusa la pagina.
+     - Si segna la partita mentre ci sei dentro (in attesa o in corso).
+     - Quando finisce (status 'ended') sparisce; prima di mostrarla si
+       controlla sul server che esista ancora, non sia finita e ci sia tu.
+     - Le statistiche non c'entrano: restano come sono.
+     ========================================================= */
+  K.corso = 'tavolata-in-corso';
+  const CORSO_MAX = 3 * 864e5;                 // dopo 3 giorni una partita si considera abbandonata
+  const VER = {};                              // gioco/codice -> { ok, stato, doc, mio, t }
+  const RAW = {};                              // argomento MQTT del gioco -> gioco/codice
+  const tpDi = g => (GIOCO(g) && GIOCO(g).tp) || ('tavolata-' + g + '/v1/');
+  function corsoTutte() { const o = jget(K.corso); return o && typeof o === 'object' ? o : {}; }
+  function corsoLista(g) { const now = Date.now(); return (corsoTutte()[g] || []).filter(e => e && /^[A-Z0-9]{4,8}$/.test(e.code) && now - (e.t || 0) < CORSO_MAX); }
+  function corsoSalva(g, L) { const o = corsoTutte(); if (L.length) o[g] = L; else delete o[g]; jset(K.corso, o); }
+  function corsoServe(g, code, stato) { const e = corsoLista(g).find(x => x.code === code); return !e || e.stato !== stato || Date.now() - e.t > 60000; }
+  function segnaCorso(g, code, stato) {
+    const L = corsoLista(g).filter(x => x.code !== code);
+    corsoSalva(g, [{ code, t: Date.now(), stato }, ...L].slice(0, 6));
+    const v = VER[g + '/' + code]; VER[g + '/' + code] = Object.assign(v || {}, { ok: true, stato, t: Date.now() });
+  }
+  function togliCorso(g, code) {
+    const L = corsoLista(g); delete VER[g + '/' + code];
+    if (!L.some(x => x.code === code)) return;
+    corsoSalva(g, L.filter(x => x.code !== code)); render();
+  }
+  /* controllo sul server: documento della partita + posti */
+  function verificaCorso(g) {
+    if (!Net.ok || !Net.c) return;
+    corsoLista(g).forEach(e => {
+      const k = g + '/' + e.code; const v = VER[k];
+      if (v && (v.verifica || Date.now() - v.t < 60000)) return;
+      const base = tpDi(g) + 'games/' + e.code;
+      VER[k] = { ok: v ? v.ok : null, verifica: true, stato: v && v.stato, host: v && v.host, doc: undefined, mio: false, t: Date.now() };
+      RAW[base] = k;
+      try { Net.c.subscribe([base, base + '/seats/+'], { qos: 0 }); } catch (err) { }
+      setTimeout(() => valutaCorso(g, e.code, base), 3500);
+    });
+  }
+  function corsoArrivo(topic, payload) {
+    let base = null;
+    if (RAW[topic]) base = topic;
+    else { const i = topic.indexOf('/seats/'); if (i > 0 && RAW[topic.slice(0, i)]) base = topic.slice(0, i); }
+    if (!base) return;
+    const v = VER[RAW[base]]; if (!v || !v.verifica) return;
+    let d = null; if (payload && payload.length) { try { d = JSON.parse(payload.toString()); } catch (e) { return; } }
+    if (base === topic) v.doc = d;
+    else if (d && topic.endsWith('/seats/' + C.id)) v.mio = true;
+  }
+  function valutaCorso(g, code, base) {
+    try { Net.c && Net.c.unsubscribe([base, base + '/seats/+']); } catch (e) { }
+    delete RAW[base];
+    const k = g + '/' + code; const v = VER[k]; if (!v || !v.verifica) return;
+    v.verifica = false;
+    if (!Net.ok) { v.ok = null; v.t = 0; return; }          // senza connessione non si decide niente
+    const d = v.doc;
+    let ok;
+    if (!d || typeof d !== 'object') ok = false;           // partita sparita dal server
+    else if (d.status === 'ended') ok = false;             // finita
+    else if (d.status === 'lobby') ok = v.mio || d.host === C.id;
+    else ok = JSON.stringify(d).includes(C.id);           // in corso: ci sei ancora tra i giocatori?
+    v.ok = ok; v.stato = d && d.status; v.host = d && (d.hostName || ''); v.doc = undefined; v.t = Date.now();
+    if (!ok) togliCorso(g, code); else render();
+  }
+  function corsoHTML(g) {
+    const L = corsoLista(g).filter(e => VER[g + '/' + e.code] && VER[g + '/' + e.code].ok === true);
+    if (!L.length) return '';
+    return `<h3>🔄 Le tue partite in corso</h3>
+      <div class="tv-small tv-mut" style="margin-bottom:8px">Ti sei disconnesso o hai chiuso la pagina? Rientra da qui. Quando la partita finisce, sparisce da sola.</div>
+      <div class="tv-list">${L.map(e => { const v = VER[g + '/' + e.code]; return `<div class="tv-item"><div class="tv-tx"><b>Partita ${esc(e.code)}${v.host ? ' di ' + esc(v.host) : ''}</b><small>${v.stato === 'lobby' ? 'In attesa di iniziare' : '🎮 In corso'} · ${esc(quando(e.t))}</small></div><button class="tv-btn tv-sm tv-pri" data-tv="unisciti" data-g="${esc(g)}" data-c="${esc(e.code)}">Rientra</button></div>`; }).join('')}</div>`;
+  }
+
+  /* =========================================================
      ACCESSO CON GOOGLE (Firebase) — copia dell'account nel cloud
      - Facoltativo: chi non accede continua come prima (account sul dispositivo).
      - Su Firestore, nel documento utenti/<uid Google>: id e chiave dell'account
@@ -802,6 +875,17 @@
         if (key !== R.pubKey || Date.now() - R.pubT > 15000) { R.pubKey = key; R.pubT = Date.now(); R.pubblicata = st.code; pub('stanze/' + G.id + '/' + st.code, e); STANZE[G.id + '/' + st.code] = Object.assign({ gioco: G.id }, e); }
       } else togliPubblica();
     } else if (R.pubblicata) togliPubblica();
+    if (inStanza) {
+      if (S.status === 'ended') togliCorso(G.id, st.code);
+      else if ((S.status === 'lobby' || S.status === 'playing') && corsoServe(G.id, st.code, S.status)) {
+        if (S.host === C.id || (R.rawPosti || []).some(x => x && x.id === C.id) || (S.status !== 'lobby' && JSON.stringify(S).includes(C.id))) segnaCorso(G.id, st.code, S.status);
+      }
+      R.eraInGioco = { g: G.id, code: st.code };
+    } else if (R.eraInGioco) {
+      /* appena tornato alla home: ricontrolla subito quella partita (magari ne sei uscito) */
+      const k = R.eraInGioco.g + '/' + R.eraInGioco.code; if (VER[k]) { VER[k].ok = null; VER[k].t = 0; }
+      R.eraInGioco = null; render();
+    }
     pubPresenza(false);
     if (Date.now() - (tick.s || 0) > 15000) { tick.s = Date.now(); controllaStats(false); pubRiepilogo(false); }
   }
@@ -1119,6 +1203,11 @@
         p.innerHTML = `<h3>🌍 Partite pubbliche in avvio</h3><div id="tv-pubbliche-l">${stanzeHTML(G.id)}</div>`;
         box.insertAdjacentElement('afterend', p);
       }
+      if (box && !document.getElementById('tv-corso')) {
+        const p = document.createElement('div'); p.id = 'tv-corso'; p.className = 'tv-panel';
+        const h = corsoHTML(G.id); p.innerHTML = h; p.dataset.h = hashStr(h); p.style.display = h ? '' : 'none';
+        box.insertAdjacentElement('afterend', p);
+      }
     }
     if (st && st.view === 'game' && st.S && st.S.status === 'lobby') {
       const bc = document.querySelector('#app .bigcode');
@@ -1143,6 +1232,8 @@
       const ps = document.getElementById('tv-stanza'); if (ps) { const h = stanzaHTML(); if (ps.dataset.h !== hashStr(h)) { ps.dataset.h = hashStr(h); ps.innerHTML = h; } }
       const conto = document.getElementById('tv-conto'); if (conto) conto.innerHTML = `<button class="tv-btn" data-tv="conto" style="padding:5px 12px 5px 5px;border-radius:99px">${avatarHTML(C.id, 34)}<span>${esc(C.nome || 'Il mio profilo')}</span>${nonLette() ? `<span class="tv-badge">${nonLette()}</span>` : quantiOnline() ? `<span class="tv-small tv-on">● ${quantiOnline()}</span>` : ''}</button>`;
       const tutte = document.getElementById('tv-stanze-tutte'); if (tutte) tutte.innerHTML = stanzeHTML(null, true);
+      const co = document.getElementById('tv-corso');
+      if (co && G) { verificaCorso(G.id); const h = corsoHTML(G.id); if (co.dataset.h !== hashStr(h)) { co.dataset.h = hashStr(h); co.innerHTML = h; co.style.display = h ? '' : 'none'; } }
       const ao = document.getElementById('tv-amici-online');
       if (ao) { const L = amiciOrdinati().filter(a => online(a.id)); ao.innerHTML = L.length ? `<div class="tv-list">${L.map(a => rigaAmico(a, false)).join('')}</div>` : `<div class="tv-mut tv-small">${A.lista.length ? 'Nessun amico online in questo momento.' : 'Aggiungi i tuoi amici con il loro codice: qui vedrai chi è online e dove sta giocando.'} <button class="tv-btn tv-sm" data-tv="conto" style="margin-left:4px">👥 Amici</button></div>`; }
       renderAvvisi();
