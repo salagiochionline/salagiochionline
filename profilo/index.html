@@ -62,6 +62,8 @@
   .recent .r .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px;flex:none}
   .recent .r .t{flex:1;min-width:0}.recent .r small{color:var(--muted)}
   .res{font-weight:800;white-space:nowrap}.res.win{color:var(--green)}
+  details.senzag{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  details.senzag summary{cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:700}
   .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
   @media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.me{grid-template-columns:minmax(0,1fr);justify-items:start}}
   .warn{color:#ffb4b4}
@@ -143,6 +145,7 @@ function recentiHTML() {
 
 /* ---------------- il mio profilo ---------------- */
 let emoAperte = false;
+let senzaGAperto = false;
 function googleHTML() {
   const g = T.google.stato();
   if (!g.disponibile) return '';
@@ -152,10 +155,21 @@ function googleHTML() {
     ${g.stato === 'dentro' ? '' : `<p class="small" style="margin-bottom:12px">Accedi con Google e nome, foto, amici e statistiche restano al sicuro: se cambi telefono, usi un altro computer o cancelli i dati del browser, ti basta accedere di nuovo per ritrovare tutto.</p>`}
     ${T.google.html(false)}
     <p class="small mut" style="margin-top:12px">Google serve solo a riconoscerti: non vediamo la tua password e la tua email non viene mostrata a nessuno. Puoi uscire o cancellare i dati salvati quando vuoi.</p>
+    <details class="senzag" ${senzaGAperto ? 'open' : ''}><summary>Non hai un account Google? Collega i dispositivi con il link segreto</summary><div style="margin-top:10px">${linkSegretoHTML()}</div></details>
   </div>`;
+}
+function linkSegretoHTML() {
+  return `<p class="small">Vuoi lo stesso account sul telefono e sul computer? Copia questo <b>link segreto</b> e aprilo sull'altro dispositivo (per esempio mandandotelo su WhatsApp): avrai lo stesso nome, gli stessi amici e le statistiche di tutti e due.</p>
+      <div class="row" style="margin-top:12px"><button class="tv-btn tv-pri" data-tv="copia" data-txt="${esc(T.linkDispositivo())}" data-ok="Link segreto copiato: aprilo sull'altro dispositivo">🔑 Copia il link segreto</button></div>
+      <p class="small warn" style="margin-top:10px">Non darlo agli amici: chi lo apre usa il tuo account. Agli amici dai il codice amico.</p>
+      <div class="lbl">Hai un link da un altro dispositivo?</div>
+      <div class="row" style="flex-wrap:nowrap"><input id="plink" class="tv-in" style="flex:1;min-width:0" placeholder="Incolla qui il link segreto"><button class="tv-btn" id="pcollega">Collega</button></div>
+      <div id="plinkok" class="small mut" style="margin-top:6px"></div>
+`;
 }
 function renderMio() {
   const c = T.conto();
+  const g0 = T.google.stato(), altri = linkSegretoHTML();
   const sc = scrollY;
   const nmFocus = document.activeElement && document.activeElement.id === 'pnome';
   const nmVal = nmFocus ? $('#pnome').value : null;
@@ -189,7 +203,7 @@ function renderMio() {
   </div>
   ${recentiHTML()}
 
-  <div class="two">
+  <div class="${g0.disponibile ? '' : 'two'}">
     <div class="card">
       <h2>👥 Amici <span class="small mut">${amici.filter(a => a.online).length} online su ${amici.length}</span></h2>
       <div class="small mut">Il tuo codice amico</div>
@@ -201,14 +215,9 @@ function renderMio() {
       <div id="tv-codice-esito" class="small mut" style="margin-top:6px"></div>
       ${usc.length ? `<div class="tv-list">${usc.map(u => `<div class="tv-item">${T.avatarHTML(u.id, 32)}<div class="tv-tx"><b>${esc((T.profiloDi(u.id) || {}).nome || T.codiceAmico(u.id))}</b><small>Richiesta mandata · in attesa</small></div><button class="tv-btn tv-sm tv-gh" data-tv="annulla" data-id="${u.id}">Annulla</button></div>`).join('')}</div>` : ''}
     </div>
-    <div class="card">
+    ${g0.disponibile ? '' : `<div class="card">
       <h2>📱 Altri dispositivi</h2>
-      ${T.google.stato().disponibile ? '<p class="small" style="margin-bottom:8px">Il modo più semplice: <b>accedi con Google</b> su tutti i dispositivi. In alternativa, senza Google:</p>' : ''}<p class="small">Vuoi lo stesso account sul telefono e sul computer? Copia questo <b>link segreto</b> e aprilo sull'altro dispositivo (per esempio mandandotelo su WhatsApp): avrai lo stesso nome, gli stessi amici e le statistiche di tutti e due.</p>
-      <div class="row" style="margin-top:12px"><button class="tv-btn tv-pri" data-tv="copia" data-txt="${esc(T.linkDispositivo())}" data-ok="Link segreto copiato: aprilo sull'altro dispositivo">🔑 Copia il link segreto</button></div>
-      <p class="small warn" style="margin-top:10px">Non darlo agli amici: chi lo apre usa il tuo account. Agli amici dai il codice amico.</p>
-      <div class="lbl">Hai un link da un altro dispositivo?</div>
-      <div class="row" style="flex-wrap:nowrap"><input id="plink" class="tv-in" style="flex:1;min-width:0" placeholder="Incolla qui il link segreto"><button class="tv-btn" id="pcollega">Collega</button></div>
-      <div id="plinkok" class="small mut" style="margin-top:6px"></div>
+${altri}    </div>`}
     </div>
   </div>
   <p class="small mut" style="margin-top:18px;text-align:center">${T.collegato() ? '🟢 Collegato' : '🟠 Mi sto collegando…'} · ${T.google.stato().stato === 'dentro' ? 'Account salvato con Google.' : 'Account senza password: vive su questo dispositivo e su quelli che colleghi' + (T.google.stato().disponibile ? ' con Google o' : '') + ' col link segreto.'}</p>`;
@@ -224,6 +233,7 @@ function renderMio() {
   document.querySelectorAll('[data-col]').forEach(b => b.onclick = () => T.salvaProfilo({ colore: b.dataset.col }));
   const ci = $('#tv-codice-in'); ci.onkeydown = e => { if (e.key === 'Enter') document.querySelector('[data-tv="agg-codice"]').click(); };
   $('#pcollega').onclick = () => chiediCollega($('#plink').value);
+  const sg = document.querySelector('details.senzag'); if (sg) sg.ontoggle = () => { senzaGAperto = sg.open; };
 }
 
 function chiediCollega(txt) {
