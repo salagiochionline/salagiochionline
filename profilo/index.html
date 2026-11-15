@@ -143,6 +143,17 @@ function recentiHTML() {
 
 /* ---------------- il mio profilo ---------------- */
 let emoAperte = false;
+function googleHTML() {
+  const g = T.google.stato();
+  if (!g.disponibile) return '';
+  if (g.stato !== 'dentro') T.google.prepara();
+  return `<div class="card" id="pgoogle">
+    <h2>☁️ ${g.stato === 'dentro' ? 'Account salvato con Google' : 'Salva il tuo account con Google'}</h2>
+    ${g.stato === 'dentro' ? '' : `<p class="small" style="margin-bottom:12px">Accedi con Google e nome, foto, amici e statistiche restano al sicuro: se cambi telefono, usi un altro computer o cancelli i dati del browser, ti basta accedere di nuovo per ritrovare tutto.</p>`}
+    ${T.google.html(false)}
+    <p class="small mut" style="margin-top:12px">Google serve solo a riconoscerti: non vediamo la tua password e la tua email non viene mostrata a nessuno. Puoi uscire o cancellare i dati salvati quando vuoi.</p>
+  </div>`;
+}
 function renderMio() {
   const c = T.conto();
   const sc = scrollY;
@@ -170,6 +181,7 @@ function renderMio() {
     </div>
   </div>
 
+  ${googleHTML()}
   <div class="card">
     <h2>📊 Le mie statistiche</h2>
     ${statsHTML(giochi, true)}
@@ -191,7 +203,7 @@ function renderMio() {
     </div>
     <div class="card">
       <h2>📱 Altri dispositivi</h2>
-      <p class="small">Vuoi lo stesso account sul telefono e sul computer? Copia questo <b>link segreto</b> e aprilo sull'altro dispositivo (per esempio mandandotelo su WhatsApp): avrai lo stesso nome, gli stessi amici e le statistiche di tutti e due.</p>
+      ${T.google.stato().disponibile ? '<p class="small" style="margin-bottom:8px">Il modo più semplice: <b>accedi con Google</b> su tutti i dispositivi. In alternativa, senza Google:</p>' : ''}<p class="small">Vuoi lo stesso account sul telefono e sul computer? Copia questo <b>link segreto</b> e aprilo sull'altro dispositivo (per esempio mandandotelo su WhatsApp): avrai lo stesso nome, gli stessi amici e le statistiche di tutti e due.</p>
       <div class="row" style="margin-top:12px"><button class="tv-btn tv-pri" data-tv="copia" data-txt="${esc(T.linkDispositivo())}" data-ok="Link segreto copiato: aprilo sull'altro dispositivo">🔑 Copia il link segreto</button></div>
       <p class="small warn" style="margin-top:10px">Non darlo agli amici: chi lo apre usa il tuo account. Agli amici dai il codice amico.</p>
       <div class="lbl">Hai un link da un altro dispositivo?</div>
@@ -199,7 +211,7 @@ function renderMio() {
       <div id="plinkok" class="small mut" style="margin-top:6px"></div>
     </div>
   </div>
-  <p class="small mut" style="margin-top:18px;text-align:center">${T.collegato() ? '🟢 Collegato' : '🟠 Mi sto collegando…'} · Account senza password: vive su questo dispositivo e su quelli che colleghi col link segreto.</p>`;
+  <p class="small mut" style="margin-top:18px;text-align:center">${T.collegato() ? '🟢 Collegato' : '🟠 Mi sto collegando…'} · ${T.google.stato().stato === 'dentro' ? 'Account salvato con Google.' : 'Account senza password: vive su questo dispositivo e su quelli che colleghi' + (T.google.stato().disponibile ? ' con Google o' : '') + ' col link segreto.'}</p>`;
   scrollTo(0, sc);
   const pn = $('#pnome');
   if (nmFocus) { pn.focus(); pn.setSelectionRange(pn.value.length, pn.value.length); }
@@ -257,7 +269,7 @@ function render() {
 }
 let t = null;
 const presto = () => { clearTimeout(t); t = setTimeout(() => { const a = document.activeElement; if (a && a.tagName === 'INPUT' && a.value && a.id !== 'pnome') return; render(); }, 120); };
-['profilo', 'profili', 'amici', 'stats', 'riepilogo', 'presenza', 'posta'].forEach(e => addEventListener('tavolata:' + e, presto));
+['profilo', 'profili', 'amici', 'stats', 'riepilogo', 'presenza', 'posta', 'google'].forEach(e => addEventListener('tavolata:' + e, presto));
 addEventListener('hashchange', () => { render(); scrollTo(0, 0); });
 setInterval(presto, 15000);
 render();

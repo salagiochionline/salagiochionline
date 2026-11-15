@@ -88,7 +88,7 @@
   let A = jget(K.amici) || {};
   A = { t: A.t || 0, lista: Array.isArray(A.lista) ? A.lista : [], uscite: Array.isArray(A.uscite) ? A.uscite : [] };
   const salvaConto = () => jset(K.conto, C);
-  const salvaAmici = (cambio) => { if (cambio) A.t = Date.now(); jset(K.amici, A); emit('amici'); if (cambio) syncConto(); render(); };
+  const salvaAmici = (cambio) => { if (cambio) A.t = Date.now(); jset(K.amici, A); emit('amici'); if (cambio) { syncConto(); ggPresto(); } render(); };
 
   const PROF = Object.assign({}, jget(K.profili) || {});   // profili conosciuti (amici: anche sul dispositivo)
   const salvaProfili = () => { const o = {}; A.lista.forEach(a => { if (PROF[a.id]) o[a.id] = PROF[a.id]; }); jset(K.profili, o); };
@@ -120,7 +120,7 @@
     if (C.nome && !C.nomi.includes(C.nome)) { C.nomi.push(C.nome); syncConto(); }
     salvaConto();
     GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
-    pubProfilo(); emit('profilo', profiloDi(C.id)); aggiornaDom(C.id); render();
+    pubProfilo(); emit('profilo', profiloDi(C.id)); aggiornaDom(C.id); render(); ggPresto();
     G && G.impostaNome && C.nome && G.impostaNome(C.nome);
   }
   function impostaNome(n) { n = pulisciNome(n); if (n && n !== C.nome) salvaProfilo({ nome: n }); }
@@ -490,6 +490,213 @@
   }
 
   /* =========================================================
+     ACCESSO CON GOOGLE (Firebase) — copia dell'account nel cloud
+     - Facoltativo: chi non accede continua come prima (account sul dispositivo).
+     - Su Firestore, nel documento utenti/<uid Google>: id e chiave dell'account
+       Tavolata, profilo, nomi usati, amici. Nella sottocartella stats/ una copia
+       delle statistiche di ogni gioco. Le regole di Firestore permettono a
+       ciascuno di leggere e scrivere solo i propri documenti.
+     - Accedendo su un altro dispositivo (o su un altro indirizzo del sito)
+       si ritrova lo stesso account; le statistiche di quel dispositivo si sommano.
+     ========================================================= */
+  const FIREBASE = null;   // configurazione del progetto Firebase (apiKey, authDomain, projectId, appId…)
+  const FB_VER = '13.3.0';
+  const FB_URL = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
+  K.google = 'tavolata-google';
+  const GG = { m: null, auth: null, db: null, user: null, pronto: null, stato: FIREBASE ? 'fuori' : 'assente', msg: '', ultimo: 0, occupato: false, blocco: false, popup: false, hash: {}, presto: null };
+  const ggInfo = () => jget(K.google);
+  function ggCambio() { emit('google', ggStato()); render(); }
+  function ggStato() {
+    const i = ggInfo() || {};
+    return { disponibile: !!FIREBASE, stato: GG.stato, email: GG.user ? GG.user.email : i.email || '', nome: GG.user ? GG.user.displayName : i.nome || '', ultimo: GG.ultimo || i.ultimo || 0, msg: GG.msg };
+  }
+  function ggErrore(e) {
+    const c = (e && e.code) || '';
+    if (/popup-closed-by-user|cancelled-popup-request|user-cancelled/.test(c)) return '';
+    if (/popup-blocked/.test(c)) return 'Il browser ha bloccato la finestra di Google: permetti i popup per questo sito e riprova.';
+    if (/unauthorized-domain/.test(c)) return 'Questo indirizzo del sito non è ancora autorizzato in Firebase (Authentication → Impostazioni → Domini autorizzati).';
+    if (/network-request-failed|unavailable/.test(c)) return 'Problema di connessione: riprova tra poco.';
+    if (/operation-not-supported|web-storage-unsupported|disallowed/.test(c)) return 'Questo browser non permette l\'accesso con Google: apri il sito in Chrome, Safari o Firefox (non dentro WhatsApp o Instagram).';
+    if (/permission-denied/.test(c)) return 'Firebase ha rifiutato il salvataggio: controlla le regole di Firestore.';
+    if (/operation-not-allowed|configuration-not-found/.test(c)) return 'L\'accesso con Google non è attivo in Firebase (Authentication → Metodo di accesso → Google).';
+    return 'Qualcosa non ha funzionato con Google' + (c ? ' (' + c + ')' : '') + '. Riprova.';
+  }
+  /* carica Firebase solo quando serve (chi non usa Google non scarica nulla) */
+  function ggCarica() {
+    if (!FIREBASE) return Promise.resolve(false);
+    if (GG.pronto) return GG.pronto;
+    GG.pronto = Promise.all([import(FB_URL + 'firebase-app.js'), import(FB_URL + 'firebase-auth.js'), import(FB_URL + 'firebase-firestore.js')])
+      .then(([app, au, fs]) => {
+        const a = app.initializeApp(FIREBASE, 'tavolata');
+        GG.m = { au, fs }; GG.auth = au.getAuth(a); GG.db = fs.getFirestore(a);
+        au.onAuthStateChanged(GG.auth, u => { ggUtente(u); });
+        return true;
+      })
+      .catch(e => { console.warn('tavolata google', e); GG.pronto = null; GG.msg = 'Non riesco a caricare l\'accesso con Google: controlla la connessione.'; ggCambio(); return false; });
+    return GG.pronto;
+  }
+  async function ggAccedi() {
+    if (!FIREBASE || GG.occupato) return;
+    GG.msg = '';
+    if (!GG.m) { GG.stato = 'carico'; ggCambio(); const ok = await ggCarica(); if (!ok) { GG.stato = 'fuori'; return ggCambio(); } }
+    const { au } = GG.m;
+    try {
+      const prov = new au.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
+      GG.stato = 'carico'; GG.popup = true; ggCambio();
+      await au.signInWithPopup(GG.auth, prov);   // poi pensa a tutto onAuthStateChanged
+      GG.popup = false;
+    } catch (e) { GG.popup = false; GG.stato = GG.user ? 'dentro' : 'fuori'; GG.msg = ggErrore(e); ggCambio(); }
+  }
+  async function ggEsci() {
+    try { await ggInvia(); } catch (e) { }
+    try { if (GG.m) await GG.m.au.signOut(GG.auth); } catch (e) { }
+    jset(K.google, null); GG.user = null; GG.stato = FIREBASE ? 'fuori' : 'assente'; GG.hash = {}; GG.ultimo = 0; ggCambio();
+    avviso('Sei uscito da Google. Su questo dispositivo continui a giocare con lo stesso account.');
+  }
+  async function ggElimina() {
+    if (!GG.user) return;
+    const { fs } = GG.m; const uid = GG.user.uid;
+    try {
+      const qs = await fs.getDocs(fs.collection(GG.db, 'utenti', uid, 'stats'));
+      await Promise.all(qs.docs.map(d => fs.deleteDoc(d.ref)));
+      await fs.deleteDoc(fs.doc(GG.db, 'utenti', uid));
+    } catch (e) { GG.msg = ggErrore(e); ggCambio(); return; }
+    try { await GG.m.au.signOut(GG.auth); } catch (e) { }
+    jset(K.google, null); GG.user = null; GG.stato = 'fuori'; GG.hash = {}; GG.ultimo = 0; ggCambio();
+    avviso('🗑️ Dati cancellati da Google. Su questo dispositivo l\'account resta.');
+  }
+  async function ggUtente(u) {
+    if (!u) {
+      GG.user = null;
+      if (ggInfo()) jset(K.google, null);
+      if (!GG.popup) { GG.stato = 'fuori'; ggCambio(); }
+      return;
+    }
+    GG.user = u; GG.stato = 'dentro';
+    const i = ggInfo() || {};
+    const nuovo = i.uid !== u.uid;
+    if (nuovo) GG.hash = {}; else GG.hash = i.hash || {};
+    jset(K.google, { uid: u.uid, email: u.email || '', nome: u.displayName || '', ultimo: nuovo ? 0 : i.ultimo || 0, hash: GG.hash });
+    ggCambio();
+    await ggAllinea(nuovo);
+  }
+  /* il contenuto del documento principale */
+  function ggDati() {
+    return { v: 1, id: C.id, seg: C.seg, creato: C.creato || 0, nomi: C.nomi, profilo: { nome: C.nome, foto: C.foto, emoji: C.emoji, colore: C.colore, t: C.t }, amici: { t: A.t, lista: A.lista, uscite: A.uscite } };
+  }
+  function ggUnisci(x) {
+    let cambio = false;
+    const p = pulisciProfilo(x.profilo);
+    if (p && p.t > C.t) {
+      if (p.nome) C.nome = p.nome;
+      C.foto = p.foto; C.emoji = p.emoji; C.colore = p.colore; C.t = p.t; cambio = true;
+      GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
+      pubProfilo(); emit('profilo', profiloDi(C.id)); aggiornaDom(C.id);
+      G && G.impostaNome && C.nome && G.impostaNome(C.nome);
+    }
+    const nomi = uniq([...C.nomi, ...(Array.isArray(x.nomi) ? x.nomi.map(pulisciNome) : [])]);
+    if (nomi.length !== C.nomi.length) { C.nomi = nomi; cambio = true; }
+    if (cambio) salvaConto();
+    const am = x.amici || {};
+    if ((+am.t || 0) > A.t) {
+      A = { t: +am.t, lista: (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id)).map(a => ({ id: a.id, nome: pulisciNome(a.nome), da: +a.da || 0 })), uscite: (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id)) };
+      jset(K.amici, A); A.lista.forEach(a => { sub('presenza/' + a.id); chiediProfilo(a.id); });
+      emit('amici');
+    }
+  }
+  async function ggScaricaStats() {
+    const { fs } = GG.m;
+    const qs = await fs.getDocs(fs.collection(GG.db, 'utenti', GG.user.uid, 'stats'));
+    qs.forEach(d => { let x = null; try { x = JSON.parse(d.data().dati); } catch (e) { } if (x && Array.isArray(x.recs)) uniscStats(d.id, { recs: x.recs, tomb: x.tomb || [] }); });
+  }
+  /* manda solo quello che è cambiato dall'ultima volta */
+  async function ggInvia() {
+    if (!GG.user || !GG.m || GG.blocco) return;
+    const { fs } = GG.m; const uid = GG.user.uid; const lavori = [];
+    const dati = JSON.stringify(ggDati()); const h0 = hashStr(dati);
+    if (GG.hash.main !== h0) lavori.push(fs.setDoc(fs.doc(GG.db, 'utenti', uid), { v: 1, id: C.id, t: Date.now(), dati }).then(() => { GG.hash.main = h0; }));
+    GIOCHI.forEach(g => {
+      let rs = jget(g.stats); if (!Array.isArray(rs)) rs = [];
+      const tomb = (SY[g.stats] && SY[g.stats].tomb) || [];
+      if (!rs.length && !tomb.length && !GG.hash[g.stats]) return;
+      let s = JSON.stringify({ recs: rs, tomb });
+      while (s.length > 900000 && rs.length > 10) { rs = rs.slice(Math.ceil(rs.length / 4)); s = JSON.stringify({ recs: rs, tomb }); }
+      const h = hashStr(s);
+      if (GG.hash[g.stats] !== h) lavori.push(fs.setDoc(fs.doc(GG.db, 'utenti', uid, 'stats', g.stats), { t: Date.now(), dati: s }).then(() => { GG.hash[g.stats] = h; }));
+    });
+    if (!lavori.length) return;
+    await Promise.all(lavori);
+    GG.ultimo = Date.now();
+    const i = ggInfo(); if (i && i.uid === uid) jset(K.google, Object.assign(i, { ultimo: GG.ultimo, hash: GG.hash }));
+  }
+  /* all'accesso (e a ogni apertura di pagina): unisce cloud e dispositivo */
+  async function ggAllinea(primaVolta) {
+    if (!GG.user || GG.occupato) return;
+    GG.occupato = true;
+    const { fs } = GG.m; const uid = GG.user.uid;
+    try {
+      const snap = await fs.getDoc(fs.doc(GG.db, 'utenti', uid));
+      if (!snap.exists()) {
+        GG.hash = {};
+        await ggInvia();
+        if (primaVolta) avviso('☁️ Fatto! Il tuo account ora è salvato con Google: su un altro dispositivo ti basta accedere.');
+      } else {
+        let x = null; try { x = JSON.parse(snap.data().dati); } catch (e) { }
+        if (x && /^u-[A-Z0-9]{8}$/.test(x.id) && x.seg && x.id !== C.id) { GG.occupato = false; GG.blocco = true; ggCambio(); return ggAdotta(x); }
+        if (x) ggUnisci(x);
+        await ggScaricaStats();
+        await ggInvia();
+        if (primaVolta) avviso('☁️ Bentornato! Account recuperato da Google.');
+      }
+      GG.ultimo = GG.ultimo || Date.now(); GG.msg = '';
+      const i = ggInfo(); if (i && i.uid === uid) jset(K.google, Object.assign(i, { ultimo: GG.ultimo, hash: GG.hash }));
+    } catch (e) { console.warn('tavolata google', e); GG.msg = ggErrore(e); }
+    GG.occupato = false; ggCambio(); render();
+  }
+  /* su Google c'è un account diverso da quello del dispositivo: si usa quello di Google */
+  function ggAdotta(x) {
+    const p = pulisciProfilo(x.profilo) || {};
+    const fai = async () => {
+      try { pub('presenza/' + C.id, { on: false, t: Date.now() }); } catch (e) { }
+      const vecchiNomi = C.nomi;
+      C = { id: x.id, seg: x.seg, nome: p.nome || C.nome, foto: p.foto || '', emoji: p.emoji || '', colore: p.colore || C.colore, t: p.t || 1, nomi: uniq([...(x.nomi || []).map(pulisciNome), ...vecchiNomi]), creato: +x.creato || Date.now() };
+      salvaConto();
+      GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
+      const am = x.amici || {};
+      A = { t: +am.t || 0, lista: (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id)), uscite: (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id)) };
+      jset(K.amici, A);
+      SY = {}; salvaSY();
+      GG.occupato = true; GG.blocco = false;
+      try { await ggScaricaStats(); GG.hash = {}; await ggInvia(); } catch (e) { }
+      GG.occupato = false;
+      avviso('☁️ Account recuperato da Google: ricarico la pagina…');
+      setTimeout(() => location.reload(), 900);
+    };
+    const qui = C.nome || 'senza nome', su = p.nome || 'senza nome';
+    if (!A.lista.length && C.t <= 1) return fai();
+    conferma('Usare l\'account salvato su Google?',
+      `Su Google c'è già il tuo account "${su}". Su questo dispositivo ce n'è un altro ("${qui}"${A.lista.length ? ', con ' + A.lista.length + (A.lista.length === 1 ? ' amico' : ' amici') : ''}). Userai quello di Google: le statistiche di questo dispositivo vengono aggiunte, gli amici sono quelli dell'account Google.`,
+      'Usa l\'account Google', fai, async () => { try { await GG.m.au.signOut(GG.auth); } catch (e) { } jset(K.google, null); GG.user = null; GG.blocco = false; GG.stato = 'fuori'; ggCambio(); });
+  }
+  function ggPresto() { if (!GG.user) return; clearTimeout(GG.presto); GG.presto = setTimeout(() => { ggInvia().catch(e => { GG.msg = ggErrore(e); ggCambio(); }); }, 2500); }
+  setInterval(() => { if (GG.user && !GG.occupato) ggInvia().catch(() => { }); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && GG.user && !GG.occupato) ggInvia().catch(() => { }); });
+  function ggHTML(compatto) {
+    if (!FIREBASE) return '';
+    const s = ggStato();
+    const gIco = '<svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true" style="flex:none"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>';
+    const err = s.msg ? `<div class="tv-small" style="color:#ff8787;margin-top:6px">${esc(s.msg)}</div>` : '';
+    if (s.stato === 'carico') return `<div class="tv-small tv-mut">☁️ Mi collego a Google…</div>${err}`;
+    if (s.stato === 'dentro') {
+      if (compatto) return `<div class="tv-small tv-on">☁️ Salvato con Google${s.email ? ' · ' + esc(s.email) : ''}</div>${err}`;
+      return `<div class="tv-row" style="gap:8px">${gIco}<b>${esc(s.email || s.nome || 'Account Google')}</b></div>
+        <div class="tv-small tv-mut" style="margin-top:4px">${GG.occupato ? 'Sto sincronizzando…' : s.ultimo ? 'Ultimo salvataggio ' + esc(quando(s.ultimo)) : 'Salvataggio in corso…'}</div>${err}
+        <div class="tv-row" style="margin-top:10px"><button class="tv-btn tv-sm" data-tv="g-salva">Salva adesso</button><button class="tv-btn tv-sm tv-gh" data-tv="g-esci">Esci da Google</button><button class="tv-btn tv-sm tv-gh" data-tv="g-elimina">Cancella i dati da Google</button></div>`;
+    }
+    return `<button class="tv-btn ${compatto ? 'tv-sm' : 'tv-pri'}" data-tv="g-accedi" style="gap:8px;${compatto ? '' : 'background:#fff;color:#1f1f1f'}">${gIco}Accedi con Google</button>${err}`;
+  }
+
+  /* =========================================================
      COLLEGAMENTO CON IL GIOCO APERTO
      ========================================================= */
   let G = null;
@@ -726,6 +933,10 @@
     else if (a === 'conto') apriPannello();
     else if (a === 'chiudi') chiudiPannello();
     else if (a === 'copia') copia(b.dataset.txt, b.dataset.ok || 'Copiato');
+    else if (a === 'g-accedi') ggAccedi();
+    else if (a === 'g-esci') conferma('Uscire da Google?', 'Su questo dispositivo continui a giocare con lo stesso account, ma le modifiche non verranno più salvate su Google finché non accedi di nuovo.', 'Esci', ggEsci);
+    else if (a === 'g-elimina') conferma('Cancellare i dati da Google?', 'Cancello la copia del tuo account salvata con Google (nome, amici, statistiche) ed esco. Su questo dispositivo l\'account resta com\'è.', 'Cancella', ggElimina);
+    else if (a === 'g-salva') { ggInvia().then(() => { GG.ultimo = Date.now(); avviso('☁️ Salvato'); ggCambio(); }).catch(e => { GG.msg = ggErrore(e); ggCambio(); }); }
     else if (a === 'agg-codice') {
       const inp = document.getElementById('tv-codice-in'); const r = chiediAmicizia(inp ? inp.value : '');
       const out = document.getElementById('tv-codice-esito'); if (out) { out.textContent = r.msg; out.className = 'tv-small ' + (r.ok ? 'tv-on' : 'tv-mut'); }
@@ -737,13 +948,13 @@
     const fatto = () => avviso('📋 ' + ok);
     try { navigator.clipboard.writeText(txt).then(fatto, () => { prompt('Copia questo testo:', txt); }); } catch (e) { prompt('Copia questo testo:', txt); }
   }
-  function conferma(tit, testo, si, fn) {
+  function conferma(tit, testo, si, fn, no) {
     const m = document.createElement('div'); m.className = 'tv-modal';
     m.innerHTML = `<div class="tv-panel"><h3>${esc(tit)}</h3><p class="tv-mut" style="margin:0 0 14px">${esc(testo)}</p><div class="tv-row" style="justify-content:flex-end"><button class="tv-btn tv-gh" data-x>Annulla</button><button class="tv-btn tv-pri" data-y>${esc(si)}</button></div></div>`;
     document.body.appendChild(m);
-    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-x]').onclick = () => { m.remove(); no && no(); };
     m.querySelector('[data-y]').onclick = () => { m.remove(); fn(); };
-    m.onclick = e => { if (e.target === m) m.remove(); };
+    m.onclick = e => { if (e.target === m) { m.remove(); no && no(); } };
   }
 
   /* ---- descrizione di dove si trova un amico ---- */
@@ -786,6 +997,7 @@
   }
   function renderPannello() {
     const d = document.getElementById('tv-dr'); if (!d || !pannelloAperto) return;
+    if (FIREBASE && !GG.user) ggCarica();
     const inv = puoInvitare();
     const ric = richiesteInArrivo();
     const usc = A.uscite;
@@ -793,6 +1005,7 @@
     const inp = document.getElementById('tv-codice-in'); const val = inp ? inp.value : ''; const foc = document.activeElement === inp;
     d.innerHTML = `<button class="tv-btn tv-sm tv-gh tv-x" data-tv="chiudi" aria-label="Chiudi">✕</button>
       <div class="tv-row" style="gap:12px;margin:4px 0 14px">${avatarHTML(C.id, 58)}<div><div style="font-size:20px;font-weight:800">${esc(C.nome || 'Senza nome')}</div><a class="tv-small" style="color:#ffcf4a" href="${BASE}profilo/${QS}">Profilo e statistiche →</a></div></div>
+      ${FIREBASE ? `<div class="tv-panel" style="margin-bottom:12px">${GG.stato === 'dentro' ? ggHTML(true) : `<div class="tv-small tv-mut" style="margin-bottom:8px">Salva nome, amici e statistiche: li ritrovi su ogni dispositivo.</div>${ggHTML(true)}`}</div>` : ''}
       <div class="tv-panel" style="margin-bottom:12px"><div class="tv-small tv-mut">Il tuo codice amico</div><div class="tv-row tv-between"><span class="tv-codice">${codiceAmico(C.id)}</span><span class="tv-row"><button class="tv-btn tv-sm" data-tv="copia" data-txt="${codiceAmico(C.id)}" data-ok="Codice copiato">Copia</button><button class="tv-btn tv-sm" data-tv="copia" data-txt="${esc(BASE + 'profilo/#' + C.id.slice(2))}" data-ok="Link copiato: mandalo a chi vuoi aggiungere">Link</button></span></div>
       <div class="tv-small tv-mut" style="margin-top:6px">Dallo agli amici: con questo codice ti aggiungono e potete invitarvi a giocare senza mandarvi codici di partita.</div></div>
       ${inv ? `<div class="tv-note">Sei in una stanza: premi <b>Invita</b> accanto a un amico e gli arriva l'invito, ovunque sia nella sala giochi.</div>` : ''}
@@ -940,6 +1153,7 @@
     if (document.getElementById('tv-stanze-tutte')) sub('stanze/+/+');
     connetti();
     preparaCifra();
+    if (FIREBASE && ggInfo()) { GG.stato = 'carico'; ggCarica(); }
     if (!G) {
       setInterval(() => { pubPresenza(false); if (Date.now() - (avvio.s || 0) > 15000) { avvio.s = Date.now(); controllaStats(false); pubRiepilogo(false); } }, 3000);
     }
@@ -949,7 +1163,7 @@
   addEventListener('pageshow', e => { if (e.persisted) pubPresenza(true); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { pubPresenza(true); controllaStats(false); } });
   addEventListener('storage', e => {
-    if (e.key === K.conto) { const n = jget(K.conto); if (n && n.id === C.id && n.t > C.t) { C = n; emit('profilo', profiloDi(C.id)); G && G.impostaNome && C.nome && G.impostaNome(C.nome); render(); } }
+    if (e.key === K.conto) { const n = jget(K.conto); if (n && n.id && n.id !== C.id) return location.reload(); if (n && n.id === C.id && n.t > C.t) { C = n; emit('profilo', profiloDi(C.id)); G && G.impostaNome && C.nome && G.impostaNome(C.nome); render(); } }
     if (e.key === K.amici) { const n = jget(K.amici); if (n) { A = { t: n.t || 0, lista: n.lista || [], uscite: n.uscite || [] }; A.lista.forEach(a => { sub('presenza/' + a.id); chiediProfilo(a.id); }); render(); } }
   });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avvio); else setTimeout(avvio, 0);
@@ -968,6 +1182,7 @@
     riepilogoDi: id => { if (id === C.id) return { t: Date.now(), giochi: riepilogoLocale() }; sub('utenti/' + id + '/riepilogo'); return RIEP[id] || null; },
     seguiProfilo: id => { chiediProfilo(id); sub('presenza/' + id); },
     online, statoAmico, linkDispositivo, collegaDa, codiceAmico, idDaCodice, EMOJI, COLORI, BASE, QS,
-    collegato: () => Net.ok, esc, quando, render
+    collegato: () => Net.ok, esc, quando, render,
+    google: { stato: ggStato, accedi: ggAccedi, esci: ggEsci, elimina: ggElimina, salva: ggInvia, prepara: ggCarica, html: ggHTML }
   };
 })();
