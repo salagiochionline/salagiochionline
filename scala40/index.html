@@ -393,6 +393,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
     pileOpen: false,        // variante a: apertura con lo scarto
     closeInHand: true,      // variante b: chiusura in mano
     noJollyOpen: false,     // variante c: apertura senza jolly
+    jollyInHand: false,     // il jolly recuperato può restare in mano
     turnTimer: 120,         // secondi per turno (0 = nessun limite)
     disconnectWait: 60      // secondi di attesa per chi si disconnette
   };
@@ -628,7 +629,9 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
     }));
     // carte del tavolo rimaste fuori
     const missing = [...tmap.keys()].filter(id => !seen.has(id));
-    if (missing.some(id => tmap.get(id).j && freed.has(id))) errors.push('Il jolly liberato va usato subito in un gioco');
+    const kept = o.jollyInHand ? missing.filter(id => tmap.get(id).j && freed.has(id)) : [];
+    kept.forEach(id => hmap.set(id, Object.assign({}, tmap.get(id), { as: null })));
+    if (!o.jollyInHand && missing.some(id => tmap.get(id).j && freed.has(id))) errors.push('Il jolly liberato va usato subito in un gioco');
     if (missing.some(id => !(tmap.get(id).j && freed.has(id)))) errors.push('Le carte del tavolo devono restare sul tavolo');
     // jolly non liberati: restano nel loro gioco
     s.table.forEach(g => g.cards.forEach(c => {
@@ -670,7 +673,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
       else if (!opened0 && !openGroups.has(newOf.get(s.picked))) errors.push('La carta presa dagli scarti deve far parte dei giochi con cui apri');
     }
     // carte che restano in mano
-    const remaining = p.hand.filter(c => !seen.has(c.id)).map(c => c.id);
+    const remaining = p.hand.filter(c => !seen.has(c.id)).map(c => c.id).concat(kept);
     if (!remaining.length) errors.push('Devi tenere almeno una carta da scartare');
     const closing = remaining.length === 1;
     if (closing && p.turns === 0) errors.push('Al tuo primo turno non puoi chiudere: tieni almeno 2 carte');
@@ -696,7 +699,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
       ok: arrOk && discard != null && !discardErr, arrOk, errors, discardErr,
       groups: res, played: played.map(c => c.id), freed: [...freed], attached,
       openPts, openPtsNoJ, opening, opened0, openErr, remaining, forbid, closing,
-      openGroups: [...openGroups]
+      openGroups: [...openGroups], kept
     };
   }
 
@@ -798,8 +801,9 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
       return { gid, kind: a.kind, by: p.id, cards };
     });
     const playedSet = new Set(chk.played);
-    const dc = hmap.get(discard);
-    p.hand = p.hand.filter(c => !playedSet.has(c.id) && c.id !== discard);
+    const keptCards = (chk.kept || []).map(id => { const c = Object.assign({}, tmap.get(id)); delete c.as; return c; });
+    const dc = hmap.get(discard) || keptCards.find(c => c.id === discard);
+    p.hand = p.hand.concat(keptCards).filter(c => !playedSet.has(c.id) && c.id !== discard);
     s.pile.push(dc);
     const wasOpened = p.opened;
     if (chk.opening) { p.opened = true; p.stats.opens++; p.stats.bestOpen = Math.max(p.stats.bestOpen, s.options.noJollyOpen ? chk.openPtsNoJ : chk.openPts); }
@@ -811,7 +815,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
     const bits = [];
     if (chk.opening) bits.push('apre con ' + chk.openPts + ' punti');
     else if (n) bits.push('cala ' + n + (n === 1 ? ' carta' : ' carte'));
-    if (chk.freed.length) bits.push('recupera ' + (chk.freed.length === 1 ? 'un jolly' : chk.freed.length + ' jolly'));
+    if (chk.freed.length) bits.push('recupera ' + (chk.freed.length === 1 ? 'un jolly' : chk.freed.length + ' jolly') + (chk.kept && chk.kept.length ? (chk.kept.length === chk.freed.length ? (chk.kept.length === 1 ? ' e lo tiene in mano' : ' e li tiene in mano') : ' (' + chk.kept.length + ' in mano)') : ''));
     const closing = !p.hand.length;
     log(s, p.name + ' ' + (bits.length ? bits.join(' e ') + ', poi ' : '') + (closing ? 'chiude scartando ' : 'scarta ') + cardName(dc) + '.', n || closing ? 'play' : 'sys');
     emit(s, { type: 'end', player: p.id, count: n, opening: chk.opening, openPts: chk.openPts, freed: chk.freed.length, discard, closing });
@@ -1149,9 +1153,9 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
         let to = -1;
         for (let t = 0; t < groups.length && to < 0; t++) { if (t === k) continue; if (fits(groups[t], j.id)) to = t; }
         if (to < 0 && fits(g2, j.id)) to = k;
-        if (to < 0) { freed.delete(j.id); return; }
+        if (to < 0 && !s.options.jollyInHand) { freed.delete(j.id); return; }
         groups[k] = g2;
-        groups[to] = (to === k ? g2 : groups[to]).concat([j.id]);
+        if (to >= 0) groups[to] = (to === k ? g2 : groups[to]).concat([j.id]);
         steps.push({ t: 'free', k, jid: j.id, cid: c.id, to });
         takeOut([c.id]);
       }));
@@ -1175,7 +1179,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
         else if (st.t === 'att') gs[st.k] = gs[st.k].concat([st.id]);
         else if (st.t === 'free') {
           gs[st.k] = gs[st.k].filter(id => id !== st.jid).concat([st.cid]);
-          gs[st.to] = gs[st.to].concat([st.jid]);
+          if (st.to >= 0) gs[st.to] = gs[st.to].concat([st.jid]);
         }
       }
       return gs;
@@ -1330,12 +1334,14 @@ const JOLLY_HELP = `
   <p>Nel mazzo ci sono <b>4 jolly</b>. Il jolly prende il posto di qualsiasi carta, ma <b>al massimo uno per gioco</b> (niente giochi di soli jolly).</p>
   <ul><li>Quando lo cali, il gioco capisce da solo quale carta rappresenta e la scrive sul jolly (per esempio <b>7♥</b>). Per l'apertura vale quella carta.</li>
   <li><b>Recuperare un jolly:</b> se hai già aperto e hai in mano la carta vera che il jolly sostituisce, trascinala sul suo gioco: il jolly si libera e va <b>usato subito</b> in un altro gioco (nuovo o del tavolo). Non torna in mano.</li>
+  <li>Con l'opzione <b>Jolly recuperato in mano</b> invece il jolly liberato <b>finisce nella tua mano</b>: puoi usarlo subito oppure tenerlo per i turni dopo. Attenzione: se qualcuno chiude mentre ce l'hai in mano, vale 25 punti.</li>
   <li>Il jolly rimasto in mano a fine mano vale <b>25 punti</b>.</li></ul>`;
 
 const GROUPS = [
   { title: 'Varianti del regolamento', note: 'Il regolamento FISCA prevede queste varianti: decidete voi.', items: [
     { key: 'closeInHand', label: 'Chiusura in mano', highlight: true, helpTitle: 'Come funziona', help: 'Se un giocatore che <b>non aveva ancora aperto</b> cala tutte le carte e chiude <b>nello stesso turno</b>, fa “chiusura in mano”: gli avversari pagano <b>il doppio</b> dei punti che hanno in mano, e chi non aveva ancora aperto paga <b>100 punti</b>. Spenta, vale come una chiusura normale.' },
     { key: 'pileOpen', label: 'Apertura con lo scarto', help: 'Di regola solo chi ha già aperto può prendere la carta degli scarti. Con questa variante la può prendere anche chi non ha aperto, <b>purché apra subito</b> usando quella carta in uno dei giochi dell’apertura. Se poi non ci riesce, può rimetterla negli scarti e pescare dal mazzo.' },
+    { key: 'jollyInHand', label: 'Jolly recuperato in mano', help: 'Di regola il jolly che recuperi dal tavolo va usato subito in un altro gioco. Con questa opzione invece <b>finisce nella tua mano</b>: puoi calarlo subito oppure <b>tenerlo</b> e usarlo quando vuoi nei turni dopo. Se a fine mano ce l’hai ancora in mano, vale 25 punti.' },
     { key: 'noJollyOpen', label: 'Apertura senza jolly', help: 'I giochi con il jolly non contano per i 40 punti dell’apertura. Puoi calarli lo stesso nel turno in cui apri, ma solo se gli altri giochi, <b>senza jolly</b>, arrivano da soli ad almeno 40 punti.' }
   ] },
   { title: 'Tempo', items: [
@@ -1920,7 +1926,11 @@ function moveCards(ids, target) {
     return discardTurn(ids[0]);
   }
   if (ids.some(id => WS.origTable.has(id) && !isTableJolly(id))) { toast('Le carte sul tavolo restano dove sono: puoi solo attaccarci le tue', 'warn'); return rerender(); }
-  if (target.h && ids.some(id => WS.origTable.has(id))) { toast('Il jolly del tavolo non torna in mano: mettilo in un gioco', 'warn'); return rerender(); }
+  if (target.h && ids.some(id => WS.origTable.has(id))) {
+    if (!G.options.jollyInHand) { toast('Il jolly del tavolo non torna in mano: mettilo in un gioco', 'warn'); return rerender(); }
+    const fr = new Set(checkWS().freed);
+    if (ids.some(id => WS.origTable.has(id) && !fr.has(id))) { toast('Il jolly torna in mano solo dopo averlo sostituito con la carta vera', 'warn'); return rerender(); }
+  }
   if (target.g && ids.every(id => { const w = whereIs(id); return w.g === target.g; })) return rerender();
   WS.history.push(snapWS()); if (WS.history.length > 60) WS.history.shift();
   WS.hand = WS.hand.filter(id => !ids.includes(id));
@@ -1942,7 +1952,8 @@ function moveCards(ids, target) {
           const view = id => { const x = idx.get(id); return x.j ? { id, j: true, fix: x.as } : { id, r: x.r, s: x.s }; };
           if (E.analyze(without.map(view)).ok) {
             g.ids = without;
-            WS.groups.push({ gid: 'n' + (++WS.nseq), ids: [jid] });
+            if (G.options.jollyInHand) WS.hand.push(jid);
+            else WS.groups.push({ gid: 'n' + (++WS.nseq), ids: [jid] });
             freedMsg = true;
           }
         }
@@ -1953,7 +1964,7 @@ function moveCards(ids, target) {
   WS.sel = [];
   sortGroups();
   sendDraft();
-  if (freedMsg) toast('★ Jolly recuperato! Ora usalo in un altro gioco', 'good');
+  if (freedMsg) toast(G.options.jollyInHand ? '★ Jolly recuperato! È nella tua mano: usalo ora o tienilo per dopo' : '★ Jolly recuperato! Ora usalo in un altro gioco', 'good');
   rerender();
 }
 function rerender() { if (drag && drag.started) { pendingRender = true; return; } renderGame(); }
@@ -2263,7 +2274,7 @@ function renderMe(G, me) {
     hint.innerHTML = ck.ok ? (ck.mustOpen ? 'Pesca dal mazzo, oppure prendi lo scarto se ti serve per aprire subito.' : 'Pesca dal mazzo, oppure prendi lo scarto se puoi usarlo subito.') : 'Pesca dal mazzo (tocca il mazzo o il pulsante). Gli scarti li può prendere solo chi ha già aperto.';
   } else if (editing) {
     const chk = WS.chk || checkWS();
-    const played = WS.origHand.size - WS.hand.length;
+    const played = [...WS.origHand].filter(id => !WS.hand.includes(id)).length;
     $('#undoBtn').disabled = !WS.history.length;
     $('#resetBtn').disabled = !WS.history.length && !played;
     const sd = selectedDiscard();
@@ -2291,9 +2302,9 @@ function renderMe(G, me) {
   // la mano
   const idx = cardIndex(G);
   const ids = editing ? WS.hand : p.hand.map(c => c.id);
-  const cards = sortCards(ids.map(id => idx.get(id)).filter(Boolean));
+  const cards = sortCards(ids.map(id => { const c = idx.get(id); return c && c.j && c.as ? Object.assign({}, c, { as: null }) : c; }).filter(Boolean));
   const sel = editing ? WS.sel : [];
-  const back = editing && sel.length && sel.every(id => WS.origHand.has(id)) && sel.some(id => !WS.hand.includes(id));
+  const back = editing && sel.length && sel.every(id => WS.origHand.has(id) || (G.options.jollyInHand && isTableJolly(id))) && sel.some(id => !WS.hand.includes(id));
   const myTurnPlay = G.phase === 'turn' && G.turn === me && G.step === 'play';
   $('#hand').innerHTML = cards.map(c => {
     const ex = [];
@@ -2498,6 +2509,7 @@ function rulesHTML() {
   if (o.mode === 'soglia') on.push(`<li><b>Rientro:</b> ${o.reentry ? 'sì, una volta a testa (riparti dal punteggio più alto di chi è ancora in gioco)' : 'no'}</li>`);
   on.push(`<li><b>Chiusura in mano:</b> ${o.closeInHand ? 'sì: punti doppi agli altri, 100 a chi non ha aperto' : 'no, vale come una chiusura normale'}</li>`);
   on.push(`<li><b>Apertura con lo scarto:</b> ${o.pileOpen ? 'sì, se usi subito la carta per aprire' : 'no, gli scarti li prende solo chi ha aperto'}</li>`);
+  on.push(`<li><b>Jolly recuperato:</b> ${o.jollyInHand ? 'torna in mano: puoi usarlo subito o tenerlo per dopo' : 'va usato subito in un altro gioco'}</li>`);
   on.push(`<li><b>Apertura senza jolly:</b> ${o.noJollyOpen ? 'sì, i giochi con il jolly non contano per i 40 punti' : 'no, il jolly vale la carta che sostituisce'}</li>`);
   on.push(`<li><b>Tempo per turno:</b> ${o.turnTimer ? fmtTime(o.turnTimer * 1000) + ' minuti' : 'nessun limite'}</li>`);
   on.push(`<li><b>Attesa per chi si disconnette:</b> ${fmtTime(o.disconnectWait * 1000)}</li>`);
@@ -2505,7 +2517,7 @@ function rulesHTML() {
   return `<h2>Regole di questa partita</h2>${exampleGroups()}<ul class="rules-list">${on.join('')}
     <li><b>Il turno:</b> peschi (dal mazzo, o lo scarto se hai aperto e lo usi subito), cali o attacchi, e finisci scartando una carta.</li>
     <li><b>Apertura:</b> almeno 40 punti con giochi nuovi fatti con carte tue. Nella scala l'asso vale 1 prima del 2 e 11 dopo il K; nel tris vale 11.</li>
-    <li><b>Dopo l'apertura:</b> puoi attaccare ai giochi di tutti e recuperare i jolly mettendo al loro posto la carta vera (il jolly va riusato subito).</li>
+    <li><b>Dopo l'apertura:</b> puoi attaccare ai giochi di tutti e recuperare i jolly mettendo al loro posto la carta vera (${o.jollyInHand ? 'il jolly ti torna in mano' : 'il jolly va riusato subito'}).</li>
     <li><b>Scarti:</b> niente carte che si attaccano a un gioco sul tavolo (⛔), tranne quando chiudi o, in due, dopo aver aperto. La carta presa dagli scarti non si riscarta.</li>
     <li><b>Chiusura:</b> si chiude scartando l'ultima carta, mai al primo turno.</li>
     <li><b>Mazzo finito:</b> gli scarti vengono rimescolati, fino a due volte. Se finisce una terza volta la mano si chiude e vince chi ha meno punti in mano.</li></ul>
