@@ -499,7 +499,14 @@
      - Accedendo su un altro dispositivo (o su un altro indirizzo del sito)
        si ritrova lo stesso account; le statistiche di quel dispositivo si sommano.
      ========================================================= */
-  const FIREBASE = null;   // configurazione del progetto Firebase (apiKey, authDomain, projectId, appId…)
+  const FIREBASE = {       // progetto Firebase "Tavolata" (questi dati non sono segreti: proteggono le regole di Firestore)
+    apiKey: 'AIzaSyApcqPk0l86K8pNnSZ3EZlZpWmwwZMXVSY',
+    authDomain: 'tavolata-b9f07.firebaseapp.com',
+    projectId: 'tavolata-b9f07',
+    storageBucket: 'tavolata-b9f07.firebasestorage.app',
+    messagingSenderId: '191403562558',
+    appId: '1:191403562558:web:ed4d00cc2fef7e370ba36f'
+  };
   const FB_VER = '13.3.0';
   const FB_URL = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
   K.google = 'tavolata-google';
