@@ -2175,6 +2175,7 @@ async function openGame(c, join) {
   else for (const k of Object.keys(KEEP)) unsubs.push(DB.collection(`games/${c}/${k}`).onSnapshot(s => { s.docs.forEach(d => { const x = d.data(); keepDoc(`games/${c}/${k}/${d.id}`, x); if (x && x.by) alive(x.by); }); cryptoSoon(); }));
   const beat = () => { if (code === c && DB) DB.doc(`games/${c}/pres/${myId}`).set({ id: myId, t: Date.now(), vis: document.visibilityState !== 'hidden' }).catch(() => { }); };
   beat(); hbTimer = setInterval(beat, 5000);
+  { const torna = () => { if (!document.hidden) beat(); }; document.addEventListener('visibilitychange', torna); addEventListener('online', torna); unsubs.push(() => { document.removeEventListener('visibilitychange', torna); removeEventListener('online', torna); }); }
   document.onvisibilitychange = () => { if (document.visibilityState === 'hidden') lastTrouble = Date.now(); else visibleSince = Date.now(); beat(); };
   openedAt = Date.now(); lastTrouble = Date.now();
   dutyTimer = setInterval(dutyTick, 1000);
@@ -2385,7 +2386,7 @@ function startMatch() {
    oppure, se è offline o in secondo piano, il primo giocatore collegato.
    ========================================================= */
 const isBotId = id => { const G = S && S.game; const p = G && G.players.find(p => p.id === id); return !!(p && p.bot); };
-function isPresent(id) { return id === myId || isBotId(id) || (lastSeen[id] && Date.now() - lastSeen[id] < 16000); }
+function isPresent(id) { return id === myId || isBotId(id) || (lastSeen[id] && Date.now() - lastSeen[id] < 30000); }
 function isVisible(id) { return id === myId ? document.visibilityState !== 'hidden' : lastVis[id] !== false; }
 function dutyId() {
   if (!S) return null;

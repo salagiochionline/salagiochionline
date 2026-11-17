@@ -1546,6 +1546,7 @@ async function openGame(c, join) {
   }, () => { }));
   const beat = () => { if (code === c && DB) DB.doc(`games/${c}/pres/${myId}`).set({ id: myId, t: Date.now(), vis: !document.hidden }).catch(() => { }); };
   beat(); hbTimer = setInterval(beat, 5000);
+  { const torna = () => { if (!document.hidden) beat(); }; document.addEventListener('visibilitychange', torna); addEventListener('online', torna); unsubs.push(() => { document.removeEventListener('visibilitychange', torna); removeEventListener('online', torna); }); }
   openedAt = Date.now();
   dutyTimer = setInterval(dutyTick, 1000);
   uiTick = setInterval(tickUI, 500);
@@ -1697,7 +1698,7 @@ const G_ = () => S && S.game;
 const meP = () => S && S.game ? S.game.players.find(p => p.id === myId) : null;
 const nameOf = id => { const p = S && S.game && S.game.players.find(p => p.id === id); return p ? p.name : '?'; };
 const pIdx = id => S.game.players.findIndex(p => p.id === id);
-function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 16000); }
+function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 30000); }
 function isVisibleId(id) { return id === myId ? !document.hidden : presVis[id] !== false; }
 function dutyId() {
   if (!S) return null;

@@ -1376,6 +1376,7 @@ async function openGame(c, join) {
   unsubs.push(DB.collection(`games/${c}/down`).onSnapshot(s => { downDocs = {}; s.docs.forEach(d => { downDocs[d.id] = d.data(); }); if (S && S.game && view === 'game' && S.status !== 'lobby') renderDuel(S.game); }));
   const beat = () => { if (code === c && DB) DB.doc(`games/${c}/pres/${myId}`).set({ id: myId, t: Date.now(), vis: document.visibilityState !== 'hidden' }).catch(() => { }); };
   beat(); hbTimer = setInterval(beat, 5000);
+  { const torna = () => { if (!document.hidden) beat(); }; document.addEventListener('visibilitychange', torna); addEventListener('online', torna); unsubs.push(() => { document.removeEventListener('visibilitychange', torna); removeEventListener('online', torna); }); }
   document.onvisibilitychange = () => { if (document.visibilityState === 'hidden') lastTrouble = Date.now(); else visibleSince = Date.now(); beat(); };
   openedAt = Date.now(); lastTrouble = Date.now();
   dutyTimer = setInterval(dutyTick, 1000);
@@ -1584,7 +1585,7 @@ function startMatch() {
    La svolge un solo dispositivo: chi ha creato la partita,
    oppure, se è offline o in secondo piano, il primo giocatore collegato.
    ========================================================= */
-function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 16000); }
+function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 30000); }
 function isVisible(id) { return id === myId ? document.visibilityState !== 'hidden' : lastVis[id] !== false; }
 function dutyId() {
   if (!S) return null;

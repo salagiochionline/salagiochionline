@@ -259,6 +259,17 @@
       if (d.ok) { if (!eAmico(da)) { aggiungiAmico(da, d.nome, true); avviso(`🎉 ${pulisciNome(d.nome) || 'Un amico'} ha accettato la tua amicizia`); } }
       else if (era) salvaAmici(true);
       svuota(tipo, da); return;
+    } else if (tipo === 'nuovoid') {
+      /* un amico è passato a un altro account (accesso con Google o link segreto): si aggiorna la lista */
+      const nuovo = d && String(d.nuovo || '');
+      if (/^u-[A-Z0-9]{8}$/.test(nuovo) && nuovo !== C.id && (eAmico(da) || A.uscite.some(u => u.id === da))) {
+        const v = A.lista.find(a => a.id === da);
+        A.lista = A.lista.filter(a => a.id !== da);
+        A.uscite = A.uscite.filter(u => u.id !== da);
+        if (!eAmico(nuovo)) A.lista.push({ id: nuovo, nome: pulisciNome(d.nome) || (v && v.nome) || 'Amico', da: (v && v.da) || Date.now() });
+        unsub('presenza/' + da); sub('presenza/' + nuovo); chiediProfilo(nuovo); salvaAmici(true); salvaProfili();
+      }
+      svuota(tipo, da); return;
     } else if (tipo === 'rimozione') {
       if (eAmico(da)) { A.lista = A.lista.filter(a => a.id !== da); salvaAmici(true); }
       svuota(tipo, da); return;
@@ -473,6 +484,10 @@
     if (cambiato) { clearTimeout(statsEmitT); statsEmitT = setTimeout(() => { emit('stats'); render(); }, 300); }
   }
 
+  /* dopo un cambio di account: gli amici del vecchio account passano al nuovo */
+  function avvisaCambioId(vecchioId, amici) {
+    amici.forEach(a => { if (a && /^u-[A-Z0-9]{8}$/.test(a.id) && a.id !== C.id) pub('posta/' + a.id + '/nuovoid/' + vecchioId, { nuovo: C.id, nome: C.nome, t: Date.now() }); });
+  }
   /* ---- collegare un altro dispositivo ---- */
   function linkDispositivo() { return BASE + 'profilo/' + QS + '#collega=' + C.id.slice(2) + '.' + C.seg; }
   function collegaDa(testo) {
@@ -481,10 +496,11 @@
     const id = 'u-' + m[1];
     if (id === C.id) return { ok: true, msg: 'Questo dispositivo è già collegato a questo account.' };
     try { pub('presenza/' + C.id, { on: false, t: Date.now() }); } catch (e) { }
-    const vecchiNomi = C.nomi;
+    const vecchiNomi = C.nomi, vecchioId = C.id;
     C = { id, seg: m[2], nome: C.nome, foto: C.foto, emoji: C.emoji, colore: C.colore, t: 0, nomi: uniq([...vecchiNomi]), creato: Date.now() };
     salvaConto();
-    A = { t: 0, lista: A.lista, uscite: A.uscite }; jset(K.amici, A);
+    A = { t: 0, lista: A.lista.filter(a => a.id !== id), uscite: A.uscite }; jset(K.amici, A);
+    avvisaCambioId(vecchioId, A.lista);
     SY = {}; salvaSY();
     return { ok: true, msg: 'Fatto! Questo dispositivo ora usa lo stesso account.', ricarica: true };
   }
@@ -738,24 +754,29 @@
     const p = pulisciProfilo(x.profilo) || {};
     const fai = async () => {
       try { pub('presenza/' + C.id, { on: false, t: Date.now() }); } catch (e) { }
-      const vecchiNomi = C.nomi;
+      const vecchiNomi = C.nomi, vecchioId = C.id, vecchiAmici = A.lista.slice(), vecchieUscite = A.uscite.slice();
       C = { id: x.id, seg: x.seg, nome: p.nome || C.nome, foto: p.foto || '', emoji: p.emoji || '', colore: p.colore || C.colore, t: p.t || 1, nomi: uniq([...(x.nomi || []).map(pulisciNome), ...vecchiNomi]), creato: +x.creato || Date.now() };
       salvaConto();
       GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
       const am = x.amici || {};
-      A = { t: +am.t || 0, lista: (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id)), uscite: (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id)) };
+      const lista = (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id) && a.id !== vecchioId);
+      vecchiAmici.forEach(a => { if (a && a.id !== C.id && !lista.some(b => b.id === a.id)) lista.push(a); });
+      const uscite = (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id));
+      vecchieUscite.forEach(u => { if (u && u.id !== C.id && !uscite.some(b => b.id === u.id) && !lista.some(b => b.id === u.id)) uscite.push(u); });
+      A = { t: Date.now(), lista, uscite };
       jset(K.amici, A);
+      avvisaCambioId(vecchioId, vecchiAmici);
       SY = {}; salvaSY();
       GG.occupato = true; GG.blocco = false;
       try { await ggScaricaStats(); GG.hash = {}; await ggInvia(); } catch (e) { }
       GG.occupato = false;
       avviso('☁️ Account recuperato da Google: ricarico la pagina…');
-      setTimeout(() => location.reload(), 900);
+      setTimeout(() => location.reload(), 1800);
     };
     const qui = C.nome || 'senza nome', su = p.nome || 'senza nome';
     if (!A.lista.length && C.t <= 1) return fai();
     conferma('Usare l\'account salvato su Google?',
-      `Su Google c'è già il tuo account "${su}". Su questo dispositivo ce n'è un altro ("${qui}"${A.lista.length ? ', con ' + A.lista.length + (A.lista.length === 1 ? ' amico' : ' amici') : ''}). Userai quello di Google: le statistiche di questo dispositivo vengono aggiunte, gli amici sono quelli dell'account Google.`,
+      `Su Google c'è già il tuo account "${su}". Su questo dispositivo ce n'è un altro ("${qui}"${A.lista.length ? ', con ' + A.lista.length + (A.lista.length === 1 ? ' amico' : ' amici') : ''}). Userai quello di Google: le statistiche e gli amici di questo dispositivo vengono aggiunti, e i tuoi amici vengono avvisati del cambio.`,
       'Usa l\'account Google', fai, async () => { try { await GG.m.au.signOut(GG.auth); } catch (e) { } jset(K.google, null); GG.user = null; GG.blocco = false; GG.stato = 'fuori'; ggCambio(); });
   }
   function ggPresto() { if (!GG.user) return; clearTimeout(GG.presto); GG.presto = setTimeout(() => { ggInvia().catch(e => { GG.msg = ggErrore(e); ggCambio(); }); }, 2500); }

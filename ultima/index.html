@@ -1650,6 +1650,7 @@ async function openGame(c, join) {
   }, () => { }));
   const beat = () => { if (code === c && DB) DB.doc(`games/${c}/pres/${myId}`).set({ id: myId, t: Date.now() }).catch(() => { }); };
   beat(); hbTimer = setInterval(beat, 5000);
+  { const torna = () => { if (!document.hidden) beat(); }; document.addEventListener('visibilitychange', torna); addEventListener('online', torna); unsubs.push(() => { document.removeEventListener('visibilitychange', torna); removeEventListener('online', torna); }); }
   openedAt = Date.now();
   dutyTimer = setInterval(dutyTick, 1000);
   uiTick = setInterval(tickUI, 500);
@@ -1796,7 +1797,7 @@ function startMatch() {
    Li svolge un solo dispositivo: chi ha creato la partita,
    oppure, se è offline, il primo giocatore ancora collegato.
    ========================================================= */
-function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 16000); }
+function isPresent(id) { return id === myId || (lastSeen[id] && Date.now() - lastSeen[id] < 30000); }
 function dutyId() {
   if (!S) return null;
   if (!S.game) return S.host;
