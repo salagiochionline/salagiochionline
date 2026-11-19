@@ -1,0 +1,10 @@
+// Configurazione per Cloudflare (Workers con file statici): pubblica il sito così com'è, senza build.
+{
+  "name": "tavolata",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}
