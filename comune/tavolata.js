@@ -78,7 +78,27 @@
     GIOCHI.forEach(g => { const v = pulisciNome(lsg(g.nomeK)); if (v) n.push(v); });
     return uniq(n);
   }
+  /* TRASLOCO (dal 19/11/2026): il sito si sposta su un nuovo indirizzo.
+     Sul vecchio indirizzo una schermata porta al nuovo con l'account nel frammento
+     (#trasloco=ID.SEG, come il link segreto: il frammento non arriva a nessun server).
+     Sul nuovo indirizzo, se il dispositivo non ha ancora un account suo, lo prende in silenzio;
+     nome, amici e statistiche arrivano poi dal server cifrato (o da Google). */
+  const NUOVO_SITO = null;                                // es. 'https://tavolata.pages.dev/'
+  const VECCHI_SITI = ['salagiochionline.github.io'];
+  const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
+  const TRASLOCO = (() => {
+    const m = location.hash.match(/(?:^#|&)trasloco=([A-Z0-9]{8})\.([a-z0-9]{16,40})(?:&h=([^&]*))?/);
+    if (!m) return null;
+    let h = ''; try { h = m[3] ? decodeURIComponent(m[3]) : ''; } catch (e) { }
+    try { history.replaceState(null, '', location.pathname + location.search + (h ? '#' + h : '')); } catch (e) { }
+    return { id: 'u-' + m[1], seg: m[2] };
+  })();
   let C = jget(K.conto);
+  if (TRASLOCO && (!C || !C.id || (C.id !== TRASLOCO.id && !C.nome && (C.t || 0) <= 1 && !((jget(K.amici) || {}).lista || []).length))) {
+    C = { id: TRASLOCO.id, seg: TRASLOCO.seg, nome: '', foto: '', emoji: '', colore: (C && C.colore) || COLORI[0], t: 0, nomi: (C && C.nomi) || [], creato: Date.now() };
+    jset(K.conto, C); jset(K.amici, { t: 0, lista: [], uscite: [] }); jset(K.sync, null);
+    TRASLOCO.fatto = true;
+  }
   if (!C || !/^u-[A-Z0-9]{8}$/.test(C.id) || !C.seg) {
     const trovati = nomiTrovati();
     C = { id: 'u-' + rid(8, ALF), seg: rid(22), nome: trovati[0] || '', foto: '', emoji: '', colore: COLORI[Math.floor(Math.random() * COLORI.length)], t: 1, nomi: trovati, creato: Date.now() };
@@ -1264,8 +1284,37 @@
   setInterval(() => { render(); }, 10000);   // aggiorna "online/offline" e stanze scadute
 
   /* ---------------- avvio ---------------- */
+  function urlNuovoSito() {
+    let rel = '';
+    try { const base = new URL(BASE); if (location.pathname.startsWith(base.pathname)) rel = location.pathname.slice(base.pathname.length); } catch (e) { }
+    const h = location.hash.replace(/^#/, '');
+    return NUOVO_SITO + rel + location.search + '#trasloco=' + C.id.slice(2) + '.' + C.seg + (h ? '&h=' + encodeURIComponent(h) : '');
+  }
+  function mostraTrasloco() {
+    const m = document.createElement('div'); m.className = 'tv-modal'; m.style.zIndex = 100000;
+    const dove = NUOVO_SITO.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    m.innerHTML = `<div class="tv-panel" style="max-width:420px;text-align:center;margin:auto">
+      <div style="font-size:2.4rem">🏠➡️🏡</div>
+      <h3 style="margin:8px 0">Tavolata ha cambiato casa!</h3>
+      <p class="tv-small" style="margin:0 0 6px">Il nuovo indirizzo è <b>${esc(dove)}</b>. Salvalo nei preferiti!</p>
+      <p class="tv-small tv-mut" style="margin:0 0 14px">Porti con te nome, foto, amici e statistiche. <span id="tv-tras-st">Preparo il tuo account…</span></p>
+      <a class="tv-btn tv-pri" id="tv-tras-vai" href="#" style="display:inline-flex">Vai al nuovo sito →</a></div>`;
+    const via = () => { try { pubProfilo(); syncConto(); controllaStats(true); } catch (e) { } location.replace(urlNuovoSito()); };
+    m.querySelector('#tv-tras-vai').onclick = e => { e.preventDefault(); via(); };
+    (document.body || document.documentElement).appendChild(m);
+    /* prima di partire salva sul server le ultime modifiche (amici, statistiche), poi va da solo */
+    let fatto = false;
+    const parti = () => { if (fatto) return; fatto = true; const st = document.getElementById('tv-tras-st'); if (st) st.textContent = 'Ti porto lì…'; setTimeout(via, 2500); };
+    const aspetta = setInterval(() => { if (Net.ok) { clearInterval(aspetta); try { pubProfilo(); syncConto(); controllaStats(true); } catch (e) { } parti(); } }, 300);
+    setTimeout(() => { clearInterval(aspetta); parti(); }, 9000);
+  }
   function avvio() {
     stile();
+    if (DA_TRASLOCARE) { connetti(); preparaCifra(); if (document.body) mostraTrasloco(); else addEventListener('DOMContentLoaded', mostraTrasloco); return; }
+    if (TRASLOCO && TRASLOCO.fatto) setTimeout(() => avviso('🏡 Benvenuto nel nuovo indirizzo di Tavolata: il tuo account è arrivato!'), 1200);
+    else if (TRASLOCO && TRASLOCO.id !== C.id) setTimeout(() => conferma('Portare qui l\'account del vecchio indirizzo?',
+      'Su questo dispositivo, nel nuovo indirizzo, c\'è già un altro account. Vuoi usare quello che avevi sul vecchio sito? Gli amici di questo dispositivo restano e vengono uniti.',
+      'Sì, usa quello vecchio', () => { const r = collegaDa(TRASLOCO.id.slice(2) + '.' + TRASLOCO.seg); if (r.ricarica) setTimeout(() => location.reload(), 1200); }), 800);
     A.lista.forEach(a => { sub('presenza/' + a.id); chiediProfilo(a.id); });
     sub('posta/' + C.id + '/#');
     sub('utenti/' + C.id + '/profilo');
