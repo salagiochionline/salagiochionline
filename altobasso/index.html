@@ -1598,7 +1598,13 @@ function dutyTick() {
       const pk = picks[p.id];
       if (pk && pk.k === pickKey() && Array.isArray(pk.cells) && pk.cells.length === 2) list.push({ type: 'reveal', player: p.id, cells: pk.cells });
       else if (p.bot && now - (S.tAt || now) > 1400) list.push(B.botReveal(G, i));
-      else if (!p.bot && late && !(S.away && S.away[p.id])) { const a = B.botReveal(G, i); a.auto = true; list.push(a); }
+      else if (!p.bot && late && !(S.away && S.away[p.id])) {
+        const a = B.botReveal(G, i); a.auto = true;
+        /* tempo scaduto dopo una sola carta: quella resta, il gioco sceglie solo la seconda */
+        const una = pk && pk.k === pickKey() && Array.isArray(pk.cells) && pk.cells.length === 1 ? pk.cells[0] : null;
+        if (una !== null) { const altre = a.cells.filter(x => x !== una); a.cells = [una, altre.length ? altre[0] : (una + 1) % p.grid.cells.length]; }
+        list.push(a);
+      }
     });
     if (list.length) return gameAct(list, true);
     return;
@@ -1658,7 +1664,8 @@ function needReveal() {
 }
 function syncPicks() {
   const k = pickKey();
-  if (myPicksKey !== k) { myPicksKey = k; myPicks = []; const pk = picks[myId]; if (pk && pk.k === k) myPicks = pk.cells.slice(); }
+  if (myPicksKey !== k) { myPicksKey = k; myPicks = []; }
+  { const pk = picks[myId]; if (pk && pk.k === k && Array.isArray(pk.cells) && pk.cells.length > myPicks.length) myPicks = pk.cells.slice(0, 2); }   // scelte già salvate (anche dopo aver ricaricato la pagina)
 }
 
 function buildGameUI() {
@@ -2142,11 +2149,12 @@ function doCell(i) {
 function pickCell(i) {
   const G = G_(); const p = G.players[myIdx()];
   if (!p.grid.cells[i] || p.grid.cells[i].up) return;
-  if (myPicks.includes(i)) { if (myPicks.length >= 2) return; myPicks = myPicks.filter(x => x !== i); renderGame(); return; }
+  /* carta toccata = carta scelta: non si può più rigirare (né ricaricando la pagina, perché ogni scelta viene salvata subito) */
+  if (myPicks.includes(i)) return toast('Questa carta è già scoperta: scegline un\'altra');
   if (myPicks.length >= 2) return;
   myPicks.push(i);
   renderGame();
-  if (myPicks.length === 2) DB.doc(`games/${code}/picks/${myId}`).set({ id: myId, k: pickKey(), cells: myPicks.slice(), t: Date.now() }).then(() => dutyTick()).catch(writeErr);
+  DB.doc(`games/${code}/picks/${myId}`).set({ id: myId, k: pickKey(), cells: myPicks.slice(), t: Date.now() }).then(() => { if (myPicks.length === 2) dutyTick(); }).catch(writeErr);
 }
 
 /* ---------- trascinamento (mouse e dito) ---------- */
