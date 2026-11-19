@@ -83,7 +83,7 @@
      (#trasloco=ID.SEG, come il link segreto: il frammento non arriva a nessun server).
      Sul nuovo indirizzo, se il dispositivo non ha ancora un account suo, lo prende in silenzio;
      nome, amici e statistiche arrivano poi dal server cifrato (o da Google). */
-  const NUOVO_SITO = null;                                // es. 'https://tavolata.pages.dev/'
+  const NUOVO_SITO = 'https://salagiochionline.tavolata.workers.dev/';                                // es. 'https://tavolata.pages.dev/'
   const VECCHI_SITI = ['salagiochionline.github.io'];
   const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
   const TRASLOCO = (() => {
