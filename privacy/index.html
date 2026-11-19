@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1d1a2f">
+<title>Privacy · Tavolata</title>
+<meta name="description" content="Quali dati usa Tavolata, il sito di giochi da tavolo online con gli amici: account sul dispositivo, server delle partite, accesso con Google, donazioni.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#1d1a2f;--bg-2:#262240;--card:#2b2647;--card-hi:#342e56;--line:rgba(255,255,255,.09);--text:#f4f1ff;--muted:#a9a3c9;--yellow:#ffcf4a;--green:#3ddc84;--radius:22px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(520px 380px at 8% 0%,rgba(255,107,107,.16),transparent 70%),radial-gradient(560px 420px at 100% 10%,rgba(77,171,247,.14),transparent 70%),radial-gradient(620px 460px at 50% 110%,rgba(255,207,74,.1),transparent 70%),var(--bg)}
+  html,body{overflow-x:hidden}
+  .wrap{max-width:1020px;margin:0 auto;padding:0 18px 50px}
+  header{padding:24px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+  .brand-mark{width:40px;height:40px;border-radius:12px;background:var(--yellow);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:7px;transform:rotate(-8deg);box-shadow:0 5px 0 #c99a17}
+  .brand-mark i{width:6px;height:6px;border-radius:50%;background:var(--bg);place-self:center}
+  .brand-mark i:nth-child(2n){visibility:hidden}
+  .brand-name{font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.5rem}
+  h1,h2{font-family:"Fredoka",sans-serif;font-weight:600}
+  h1{font-size:clamp(1.8rem,5vw,2.6rem);line-height:1.1}
+  h2{font-size:1.35rem;margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:16px}
+  .wrap{max-width:780px}
+  .card p,.card li{color:var(--text);opacity:.92;margin:0 0 10px}
+  .card ul{padding-left:20px}
+  .mut{color:var(--muted)}
+  a{color:var(--yellow)}
+  .back{display:inline-block;margin-top:6px;padding:8px 14px;border-radius:999px;background:var(--card-hi);color:var(--text);text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="../"><span class="brand-mark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="brand-name">Tavolata</span></a>
+    <a class="back" href="../">🎲 Tutti i giochi</a>
+  </header>
+  <h1>Privacy</h1>
+  <p class="mut" style="margin-top:8px">In parole semplici: quali dati usa Tavolata e dove finiscono. Ultimo aggiornamento: 19 novembre 2026.</p>
+
+  <div class="card">
+    <h2>👋 Chi siamo</h2>
+    <p>Tavolata è un progetto amatoriale per giocare online ai giochi da tavolo con gli amici. Non vendiamo dati, non mostriamo pubblicità e non usiamo cookie di profilazione.</p>
+    <p>Per domande o richieste sui tuoi dati potrai scriverci dalla pagina Ko-fi di Tavolata, appena le donazioni saranno attive (link in fondo al sito). Nel frattempo chiedi alla persona che ti ha invitato a giocare.</p>
+  </div>
+
+  <div class="card">
+    <h2>📱 Sul tuo dispositivo</h2>
+    <p>Il tuo account Tavolata nasce sul tuo dispositivo, senza email né password. Nel browser (memoria locale del sito) restano: il codice del tuo account, nome, foto o emoji, colore, amici, statistiche delle partite e qualche preferenza.</p>
+    <p>Se cancelli i dati del sito dal browser, questi dati spariscono da quel dispositivo.</p>
+  </div>
+
+  <div class="card">
+    <h2>🌐 Il server delle partite</h2>
+    <p>Per giocare insieme, il sito usa un server pubblico e gratuito di messaggi (EMQX, broker.emqx.io). Passano di lì: nome e foto che scegli, quando sei online, gli inviti, le mosse delle partite e la chat.</p>
+    <ul>
+      <li>Amici e statistiche viaggiano <b>cifrati</b>: solo i tuoi dispositivi li possono leggere.</li>
+      <li>Il resto (nome, foto, mosse, chat) potrebbe vederlo chi conosce gli indirizzi tecnici del server: <b>non scrivere in chat dati personali</b> come numeri di telefono o indirizzi.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>☁️ Accesso con Google (facoltativo)</h2>
+    <p>Se scegli "Accedi con Google", usiamo Firebase, un servizio di Google, per riconoscerti e per salvare una copia del tuo account (nome, foto, amici, statistiche) da ritrovare su altri dispositivi.</p>
+    <ul>
+      <li>Google ci comunica il tuo indirizzo email e il nome del tuo account Google: servono solo a riconoscerti e <b>non vengono mostrati a nessuno</b>. Non vediamo mai la tua password.</li>
+      <li>I dati salvati li puoi leggere e modificare solo tu.</li>
+      <li>Dalla pagina <a href="../profilo/">Il mio profilo</a> puoi uscire da Google o <b>cancellare i dati salvati</b> quando vuoi.</li>
+    </ul>
+    <p>Chi non accede con Google gioca normalmente: niente viene salvato su Firebase.</p>
+  </div>
+
+  <div class="card">
+    <h2>☕ Donazioni</h2>
+    <p>Le donazioni sono facoltative e passano da Ko-fi e PayPal, che trattano i pagamenti secondo le loro regole sulla privacy. Noi vediamo solo quello che scegli di condividere (per esempio il nome e un messaggio).</p>
+  </div>
+
+  <div class="card">
+    <h2>🔧 Servizi tecnici</h2>
+    <ul>
+      <li><b>Hosting:</b> il sito è ospitato da Cloudflare (e, fino al trasloco, da GitHub Pages), che per farlo funzionare registra dati tecnici come l'indirizzo IP.</li>
+      <li><b>Caratteri:</b> i caratteri delle pagine arrivano da Google Fonts, che riceve l'indirizzo IP del tuo dispositivo.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🧒 Ragazzi</h2>
+    <p>Se hai meno di 14 anni, usa Tavolata con il permesso dei tuoi genitori. Per l'accesso con Google serve un account Google tuo: senza puoi giocare lo stesso.</p>
+  </div>
+
+  <div class="card">
+    <h2>✋ I tuoi diritti</h2>
+    <p>Puoi chiederci quali dati abbiamo su di te, correggerli o cancellarli. Gran parte la gestisci da solo: cambiando nome e foto nel profilo, cancellando i dati da Google o i dati del sito nel tuo browser. Per il resto, scrivici (vedi "Chi siamo").</p>
+  </div>
+</div>
+<style>.tv-copy{max-width:900px;margin:28px auto 0;padding:14px 16px 24px;text-align:center;font:12px/1.55 system-ui,sans-serif;color:#a9a3c9;opacity:.8}.tv-copy a{color:inherit}</style>
+<footer class="tv-copy">© 2026 Tavolata · Tutti i diritti riservati<br>Progetto amatoriale: i nomi e i marchi dei giochi originali appartengono ai rispettivi proprietari.</footer>
+<script src="../comune/mqtt.min.js"></script>
+<script src="../comune/tavolata.js"></script>
+</body>
+</html>

@@ -83,6 +83,9 @@
      (#trasloco=ID.SEG, come il link segreto: il frammento non arriva a nessun server).
      Sul nuovo indirizzo, se il dispositivo non ha ancora un account suo, lo prende in silenzio;
      nome, amici e statistiche arrivano poi dal server cifrato (o da Google). */
+  /* DONAZIONI (Ko-fi): con KOFI = null il pulsante c'è ma è grigio, "presto disponibile".
+     Per attivarlo basta mettere il link della pagina, es. 'https://ko-fi.com/tavolata'. */
+  const KOFI = null;
   const NUOVO_SITO = 'https://salagiochionline.tavolata.workers.dev/';                                // es. 'https://tavolata.pages.dev/'
   const VECCHI_SITI = ['salagiochionline.github.io'];
   const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
@@ -980,7 +983,11 @@
   .tv-modal .tv-panel{background:#2b2647;max-width:420px;width:100%;margin:0}
   .tv-stanze-vuote{padding:10px 2px}
   @media (prefers-reduced-motion:reduce){.tv-card,.tv-dr{animation:none!important;transition:none!important}}
-  `;
+  
+.tv-dona-riga{margin-top:8px}
+.tv-dona{display:inline-block;padding:7px 14px;border-radius:999px;background:#ffcf4a;color:#1d1a2f !important;font:800 12.5px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;text-decoration:none;border:0;cursor:pointer;opacity:1}
+.tv-dona-off{background:transparent;color:inherit !important;border:1px dashed currentColor;opacity:.75;font-weight:700}
+`;
   function stile() { if (document.getElementById('tv-css')) return; const s = document.createElement('style'); s.id = 'tv-css'; s.textContent = CSS; document.head.appendChild(s); }
 
   function iniziale(n) { return esc((String(n || '?').trim().charAt(0) || '?').toUpperCase()); }
@@ -1065,6 +1072,7 @@
     else if (a === 'conto') apriPannello();
     else if (a === 'chiudi') chiudiPannello();
     else if (a === 'copia') copia(b.dataset.txt, b.dataset.ok || 'Copiato');
+    else if (a === 'dona-presto') avviso('☕ Le donazioni arriveranno presto. Grazie del pensiero!');
     else if (a === 'g-accedi') ggAccedi();
     else if (a === 'g-esci') conferma('Uscire da Google?', 'Su questo dispositivo continui a giocare con lo stesso account, ma le modifiche non verranno più salvate su Google finché non accedi di nuovo.', 'Esci', ggEsci);
     else if (a === 'g-elimina') conferma('Cancellare i dati da Google?', 'Cancello la copia del tuo account salvata con Google (nome, amici, statistiche) ed esco. Su questo dispositivo l\'account resta com\'è.', 'Cancella', ggElimina);
@@ -1308,8 +1316,20 @@
     const aspetta = setInterval(() => { if (Net.ok) { clearInterval(aspetta); try { pubProfilo(); syncConto(); controllaStats(true); } catch (e) { } parti(); } }, 300);
     setTimeout(() => { clearInterval(aspetta); parti(); }, 9000);
   }
+  function donaHTML() {
+    return KOFI
+      ? `<a class="tv-dona" href="${esc(KOFI)}" target="_blank" rel="noopener">☕ Ti piace Tavolata? Offrici un caffè su Ko-fi</a>`
+      : `<button type="button" class="tv-dona tv-dona-off" data-tv="dona-presto" title="Le donazioni non sono ancora attive">☕ Sostieni Tavolata · presto disponibile</button>`;
+  }
+  function mettiDona() {
+    document.querySelectorAll('.tv-copy, .tv-copy-home').forEach(f => {
+      if (f.querySelector('.tv-dona')) return;
+      const d = document.createElement('div'); d.className = 'tv-dona-riga'; d.innerHTML = donaHTML(); f.appendChild(d);
+    });
+  }
   function avvio() {
     stile();
+    if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mettiDona); else mettiDona();
     if (DA_TRASLOCARE) { connetti(); preparaCifra(); if (document.body) mostraTrasloco(); else addEventListener('DOMContentLoaded', mostraTrasloco); return; }
     if (TRASLOCO && TRASLOCO.fatto) setTimeout(() => avviso('🏡 Benvenuto nel nuovo indirizzo di Tavolata: il tuo account è arrivato!'), 1200);
     else if (TRASLOCO && TRASLOCO.id !== C.id) setTimeout(() => conferma('Portare qui l\'account del vecchio indirizzo?',
