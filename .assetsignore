@@ -4,3 +4,4 @@ wrangler.jsonc
 .assetsignore
 node_modules
 README.md
+.wrangler
