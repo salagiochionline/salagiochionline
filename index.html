@@ -56,6 +56,8 @@
   #tv-conto:empty{display:none}
   .head-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .head-r .tv-dona-sm{padding:9px 16px;font-size:14px}
+  .head-link{display:inline-flex;align-items:center;padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);text-decoration:none;font-weight:800;font-size:14px}
+  .head-link:hover{border-color:rgba(255,255,255,.3)}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;width:max-content}
   .brand-mark{
     width:44px;height:44px;border-radius:13px;background:var(--yellow);
@@ -151,6 +153,7 @@
   #intro-g:empty{display:none}
   #intro .tv-dona-slot .tv-dona{width:100%;justify-content:center;padding:14px 18px;font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.08rem;border-radius:16px;background:transparent;color:var(--yellow)!important;border:2px solid rgba(255,207,74,.55);box-shadow:none}
   #intro .tv-dona-slot .tv-dona:hover{background:rgba(255,207,74,.1)}
+  .intro-lingua{position:absolute;top:16px;right:16px;z-index:2}
   .intro-foot{color:var(--muted);font-size:.8rem;opacity:.8;margin-top:10px}
   .intro-foot a{color:inherit}
   html.con-intro body{overflow:hidden}
@@ -241,6 +244,7 @@
     *{animation:none!important;transition:none!important}
   }
 </style>
+<script>/* lingua: nasconde la pagina finché non è tradotta (vedi comune/tavolata.js) */try{var tvL=new URLSearchParams(location.search).get('lingua')||localStorage.getItem('tavolata-lingua')||(navigator.languages&&navigator.languages[0])||navigator.language||'it';if(!/^it/i.test(tvL))document.documentElement.className+=' tv-trad'}catch(e){}</script><style>html.tv-trad body{visibility:hidden}</style>
 </head>
 <body>
 <script>
@@ -249,6 +253,7 @@
 </script>
 
 <div id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-t" hidden>
+  <span class="tv-lingua-slot intro-lingua"></span>
   <div class="intro-box">
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
     <h1 id="intro-t">Tavolata</h1>
@@ -269,7 +274,9 @@
       <span class="brand-name">Tavolata</span>
     </a>
     <div class="head-r">
+      <a class="head-link" href="./bacheca/">💬 Domande</a>
       <span class="tv-dona-slot" data-testo="☕ Sostienici"></span>
+      <span class="tv-lingua-slot"></span>
       <div id="tv-conto"></div>
     </div>
   </header>
@@ -304,7 +311,7 @@
 
   <footer>
     <span>Tavolata · fatto per giocare insieme 🎲</span>
-    <span><a href="./profilo/" style="color:inherit">👤 Il mio profilo e le statistiche</a> · Nuovi giochi in arrivo</span>
+    <span><a href="./profilo/" style="color:inherit">👤 Il mio profilo e le statistiche</a> · <a href="./bacheca/" style="color:inherit">💬 Domande e commenti</a> · Nuovi giochi in arrivo</span>
     <span class="tv-copy-home">© 2026 Tavolata · Tutti i diritti riservati · <a href="./privacy/">Privacy</a><br>Progetto amatoriale: i nomi e i marchi dei giochi originali appartengono ai rispettivi proprietari.</span>
   </footer>
 </div>
@@ -746,8 +753,11 @@ const SINONIMI = {
   impostore: "spia bugiardo",
   bunny: "mimo"
 };
+/* parole in più per la ricerca in inglese */
+const SINONIMI_EN = { carte: "cards card", dadi: "dice", tabellone: "board", party: "party words", casino: "casino gambling" };
 function testoRicerca(g){
-  return norm([g.nome, g.descrizione, etichettaTipo(g), tipiDi(g).join(" "), SINONIMI[g.icona] || "", SINONIMI[(g.url||"").replace(/[./]/g,"")] || ""].join(" "));
+  const T = window.Tavolata, tr = s => (T && T.lingua !== "it") ? T.t(s) + " " + s : s;
+  return norm([g.nome, tr(g.descrizione), tr(etichettaTipo(g)), tipiDi(g).join(" "), tipiDi(g).map(x => SINONIMI_EN[x] || "").join(" "), SINONIMI[g.icona] || "", SINONIMI[(g.url||"").replace(/[./]/g,"")] || ""].join(" "));
 }
 function corrisponde(g){
   if (!cerca) return true;

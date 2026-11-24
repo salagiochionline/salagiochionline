@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1d1a2f">
+<title>Domande e commenti · Tavolata</title>
+<meta name="description" content="La bacheca di Tavolata: fai una domanda, segnala un problema, proponi un gioco nuovo o lascia un commento sui giochi da tavolo online.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='6' width='52' height='52' rx='12' fill='%23ffcf4a'/><circle cx='22' cy='22' r='5' fill='%231d1a2f'/><circle cx='42' cy='42' r='5' fill='%231d1a2f'/><circle cx='32' cy='32' r='5' fill='%231d1a2f'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#1d1a2f;--bg-2:#262240;--card:#2b2647;--card-hi:#342e56;--line:rgba(255,255,255,.09);--text:#f4f1ff;--muted:#a9a3c9;--yellow:#ffcf4a;--green:#3ddc84;--radius:22px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(520px 380px at 8% 0%,rgba(255,107,107,.16),transparent 70%),radial-gradient(560px 420px at 100% 10%,rgba(77,171,247,.14),transparent 70%),var(--bg)}
+  html,body{overflow-x:hidden}
+  .wrap{max-width:820px;margin:0 auto;padding:0 18px 40px}
+  header{padding:24px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+  .brand-mark{width:40px;height:40px;border-radius:12px;background:var(--yellow);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:7px;transform:rotate(-8deg);box-shadow:0 5px 0 #c99a17}
+  .brand-mark i{width:6px;height:6px;border-radius:50%;background:var(--bg);place-self:center}
+  .brand-mark i:nth-child(2n){visibility:hidden}
+  .brand-name{font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.5rem}
+  .head-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .back{display:inline-block;padding:8px 14px;border-radius:999px;background:var(--card-hi);color:var(--text);text-decoration:none;font-weight:700}
+  h1,h2,h3{font-family:"Fredoka",sans-serif;font-weight:600}
+  h1{font-size:clamp(1.8rem,5vw,2.5rem);line-height:1.1;margin-top:14px}
+  .intro{color:var(--muted);margin-top:8px;max-width:60ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-top:16px}
+  .mut{color:var(--muted)}
+  .small{font-size:.88rem}
+  a{color:var(--yellow)}
+
+  /* scrivere */
+  .scrivi h2{font-size:1.2rem;margin-bottom:10px}
+  textarea{width:100%;min-height:96px;resize:vertical;font:inherit;font-size:1rem;color:var(--text);background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;outline:none}
+  textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,207,74,.15)}
+  .riga{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .riga .spazio{flex:1}
+  select.arg{font:inherit;font-weight:700;font-size:.92rem;color:var(--text);background:var(--bg-2);border:1px solid var(--line);border-radius:999px;padding:8px 12px;max-width:100%}
+  .btn{font:inherit;font-family:"Fredoka",sans-serif;font-weight:600;font-size:1rem;border:0;border-radius:12px;padding:10px 18px;cursor:pointer;background:var(--yellow);color:var(--bg);box-shadow:0 4px 0 #c99a17}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.gh{background:rgba(255,255,255,.08);color:var(--text);box-shadow:none}
+  .chi{display:flex;align-items:center;gap:10px}
+  .err{color:#ff8787;font-weight:700;font-size:.9rem;margin-top:8px}
+  .regole{margin-top:10px;font-size:.85rem;color:var(--muted)}
+
+  /* filtri */
+  .filtri{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:22px 0 4px}
+  .filtri h2{font-size:1.3rem;margin-right:auto}
+
+  /* messaggi */
+  .msg{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:16px 0;border-top:1px solid var(--line)}
+  .msg:first-child{border-top:0}
+  .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:1.05rem;color:#1d1a2f;flex:none;overflow:hidden}
+  .av.s{width:32px;height:32px;font-size:.9rem}
+  .testa{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .testa b{font-size:1rem}
+  .staff{font-size:.72rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;background:var(--yellow);color:var(--bg);padding:2px 8px;border-radius:99px}
+  .gioco{font-size:.78rem;font-weight:800;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.07)}
+  .quando{font-size:.82rem;color:var(--muted)}
+  .testo{margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .azioni{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .azioni button{font:inherit;font-size:.85rem;font-weight:700;color:var(--muted);background:none;border:0;cursor:pointer;padding:4px 8px;border-radius:8px}
+  .azioni button:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .risposte{margin-top:10px;padding-left:14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:12px}
+  .risp{display:grid;grid-template-columns:auto 1fr;gap:10px}
+  .risp.staffr .testo{color:#fff}
+  .rispondi{margin-top:10px}
+  .rispondi textarea{min-height:70px}
+  .vuoto{color:var(--muted);text-align:center;padding:26px 6px}
+  @media (max-width:560px){ .card{padding:16px} }
+  .tv-copy{max-width:900px;margin:28px auto 0;padding:14px 16px 24px;text-align:center;font:12px/1.55 system-ui,sans-serif;color:#a9a3c9;opacity:.8}.tv-copy a{color:inherit}
+</style>
+<script>/* lingua: nasconde la pagina finché non è tradotta (vedi comune/tavolata.js) */try{var tvL=new URLSearchParams(location.search).get('lingua')||localStorage.getItem('tavolata-lingua')||(navigator.languages&&navigator.languages[0])||navigator.language||'it';if(!/^it/i.test(tvL))document.documentElement.className+=' tv-trad'}catch(e){}</script><style>html.tv-trad body{visibility:hidden}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="../" aria-label="Tavolata, tutti i giochi"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="brand-name">Tavolata</span></a>
+    <span class="head-r"><span class="tv-lingua-slot"></span><a class="back" href="../">🎲 Tutti i giochi</a></span>
+  </header>
+
+  <h1>💬 Domande e commenti</h1>
+  <p class="intro">Hai una domanda su un gioco, hai trovato un problema o vorresti un gioco nuovo? Scrivi qui: ti rispondiamo in questa pagina. Puoi anche lasciare un commento o un'idea.</p>
+
+  <section class="card scrivi" id="scrivi" aria-label="Scrivi un messaggio">
+    <div class="mut">Caricamento…</div>
+  </section>
+
+  <div class="filtri">
+    <h2>Messaggi</h2>
+    <select class="arg" id="filtro" aria-label="Mostra i messaggi di"></select>
+  </div>
+  <section class="card" id="lista" aria-live="polite">
+    <div class="vuoto">Caricamento…</div>
+  </section>
+</div>
+<footer class="tv-copy">© 2026 Tavolata · Tutti i diritti riservati · <a href="../privacy/">Privacy</a><br>Progetto amatoriale: i nomi e i marchi dei giochi originali appartengono ai rispettivi proprietari.</footer>
+
+<script src="../comune/mqtt.min.js"></script>
+<script src="../comune/tavolata.js"></script>
+<script>
+/* =========================================================
+   BACHECA — domande e commenti (dal 24/11/2026)
+   Messaggi su Firestore, raccolta "bacheca":
+   { uid, nome, emoji, colore, testo, gioco, su, t, staff, lingua }
+   - su: id del messaggio a cui si risponde (assente = messaggio nuovo)
+   - staff: true solo per l'account di Tavolata (controllato dalle regole di Firestore)
+   Leggono tutti; scrive solo chi ha fatto l'accesso con Google.
+   ========================================================= */
+(function () {
+  'use strict';
+  const T = window.Tavolata;
+  /* impronta (SHA-256) dell'email dell'account di Tavolata: l'email vera sta solo nelle regole di Firestore */
+  const STAFF = ['02b958cebf7336ad3981250a8c9d1db1036c861d20b90ecb6169902065157493'];
+  const MAX = 1000, PAUSA = 20000;
+  const esc = T.esc, tr = s => T.t(s);
+  const $ = id => document.getElementById(id);
+  let F = null, msgs = [], filtro = 'tutti', aperta = null, sonoStaff = false, ultimoInvio = 0, erroreLettura = '';
+
+  const GIOCHI = T.GIOCHI.slice();
+  const giocoDi = id => GIOCHI.find(g => g.id === id) || null;
+
+  /* ---------- filtro ---------- */
+  function disegnaFiltro() {
+    const opz = [['tutti', 'Tutti i messaggi'], ['generale', '💬 Generale'], ['_sito', '🛠️ Il sito']].concat(GIOCHI.map(g => [g.id, g.ico + ' ' + g.nome]));
+    $('filtro').innerHTML = opz.map(([v, l]) => `<option value="${v}"${v === filtro ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  }
+  $('filtro').addEventListener('change', e => { filtro = e.target.value; disegnaLista(); });
+
+  /* ---------- avatar ---------- */
+  function avatar(m, piccolo) {
+    const col = /^#[0-9a-f]{6}$/i.test(m.colore || '') ? m.colore : '#9e9cd9';
+    const dentro = m.staff ? '🎲' : (m.emoji && m.emoji.length <= 8 ? esc(m.emoji) : esc((m.nome || '?').trim().charAt(0).toUpperCase() || '?'));
+    return `<span class="av${piccolo ? ' s' : ''}" style="background:${m.staff ? '#ffcf4a' : col}" aria-hidden="true">${dentro}</span>`;
+  }
+  function etichettaGioco(id) {
+    if (!id || id === 'generale') return '';
+    if (id === '_sito') return `<span class="gioco">🛠️ ${esc(tr('Il sito'))}</span>`;
+    const g = giocoDi(id); return g ? `<span class="gioco" style="color:${g.colore}">${esc(g.ico + ' ' + g.nome)}</span>` : '';
+  }
+  const quando = m => m.t ? T.quando(m.t) : tr('adesso');
+  function puoCancellare(m) { const u = T.google.utente(); return !!u && (m.uid === u.uid || sonoStaff); }
+
+  /* ---------- un messaggio con le sue risposte ---------- */
+  function msgHTML(m, risposte) {
+    const u = T.google.utente();
+    return `<article class="msg" data-id="${m.id}">
+      ${avatar(m)}
+      <div>
+        <div class="testa"><b class="tv-notr">${esc(m.nome)}</b>${m.staff ? '<span class="staff">Tavolata</span>' : ''}${etichettaGioco(m.gioco)}<span class="quando">${esc(quando(m))}</span></div>
+        <div class="testo tv-notr">${esc(m.testo)}</div>
+        <div class="azioni">
+          ${u ? `<button type="button" data-az="rispondi" data-id="${m.id}">↩️ Rispondi</button>` : ''}
+          ${puoCancellare(m) ? `<button type="button" data-az="cancella" data-id="${m.id}">🗑️ Cancella</button>` : ''}
+        </div>
+        ${risposte.length ? `<div class="risposte">${risposte.map(r => `<div class="risp${r.staff ? ' staffr' : ''}" data-id="${r.id}">${avatar(r, true)}<div><div class="testa"><b class="tv-notr">${esc(r.nome)}</b>${r.staff ? '<span class="staff">Tavolata</span>' : ''}<span class="quando">${esc(quando(r))}</span></div><div class="testo tv-notr">${esc(r.testo)}</div>${puoCancellare(r) ? `<div class="azioni"><button type="button" data-az="cancella" data-id="${r.id}">🗑️ Cancella</button></div>` : ''}</div></div>`).join('')}</div>` : ''}
+        ${aperta === m.id ? `<div class="rispondi"><textarea id="risp-t" maxlength="${MAX}" placeholder="Scrivi la tua risposta…"></textarea><div class="riga"><span class="spazio"></span><button type="button" class="btn gh" data-az="chiudi">Annulla</button><button type="button" class="btn" data-az="invia-risp" data-id="${m.id}">Rispondi</button></div><div class="err" id="risp-err"></div></div>` : ''}
+      </div>
+    </article>`;
+  }
+  function disegnaLista() {
+    const box = $('lista');
+    if (erroreLettura) { box.innerHTML = `<div class="vuoto">${esc(erroreLettura)}</div>`; return; }
+    if (!F) return;
+    const princ = msgs.filter(m => !m.su && (filtro === 'tutti' || (m.gioco || 'generale') === filtro));
+    const risp = {}; msgs.filter(m => m.su).forEach(m => { (risp[m.su] = risp[m.su] || []).push(m); });
+    Object.values(risp).forEach(l => l.sort((a, b) => (a.t || Infinity) - (b.t || Infinity)));
+    /* se si sta scrivendo una risposta non ridisegno sopra il testo */
+    const ta = $('risp-t'); const bozza = ta ? ta.value : null; const foc = ta && document.activeElement === ta;
+    box.innerHTML = princ.length ? princ.map(m => msgHTML(m, risp[m.id] || [])).join('')
+      : `<div class="vuoto">${filtro === 'tutti' ? 'Ancora nessun messaggio. Scrivi tu il primo!' : 'Nessun messaggio su questo argomento.'}</div>`;
+    const ta2 = $('risp-t'); if (ta2 && bozza != null) { ta2.value = bozza; if (foc) ta2.focus(); }
+  }
+
+  /* ---------- riquadro per scrivere ---------- */
+  function disegnaScrivi() {
+    const box = $('scrivi');
+    const g = T.google.stato(); const u = T.google.utente(); const c = T.conto();
+    const bozza = $('nuovo-t') ? $('nuovo-t').value : '';
+    const argSel = $('nuovo-arg') ? $('nuovo-arg').value : (giocoDi(new URLSearchParams(location.search).get('gioco')) ? new URLSearchParams(location.search).get('gioco') : 'generale');
+    if (!g.disponibile) { box.innerHTML = `<p class="mut">La bacheca non è disponibile in questo momento.</p>`; return; }
+    if (!u) {
+      box.innerHTML = `<h2>✍️ Scrivi un messaggio</h2>
+        <p class="mut" style="margin-bottom:12px">Per scrivere serve l'accesso con Google (così niente spam). Leggere è libero per tutti.</p>
+        <div id="scrivi-g">${T.google.html(false)}</div>`;
+      return;
+    }
+    if (!c.nome) {
+      box.innerHTML = `<h2>✍️ Scrivi un messaggio</h2><p class="mut">Prima scegli il tuo nome: comparirà accanto ai tuoi messaggi.</p><div class="riga"><a class="btn" href="../profilo/" style="text-decoration:none">👤 Scegli il nome</a></div>`;
+      return;
+    }
+    const opz = [['generale', '💬 Generale'], ['_sito', '🛠️ Il sito']].concat(GIOCHI.map(x => [x.id, x.ico + ' ' + x.nome]));
+    box.innerHTML = `<h2>✍️ Scrivi un messaggio</h2>
+      <div class="chi" style="margin-bottom:10px">${avatar({ nome: c.nome, emoji: c.emoji, colore: c.colore, staff: sonoStaff })}<div><b class="tv-notr">${esc(c.nome)}</b>${sonoStaff ? ' <span class="staff">Tavolata</span>' : ''}<div class="small mut">Scrivi come</div></div></div>
+      <textarea id="nuovo-t" maxlength="${MAX}" placeholder="Fai una domanda o lascia un commento…"></textarea>
+      <div class="riga">
+        <select class="arg" id="nuovo-arg" aria-label="Argomento">${opz.map(([v, l]) => `<option value="${v}"${v === argSel ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <span class="small mut" id="conta">0/${MAX}</span>
+        <span class="spazio"></span>
+        <button type="button" class="btn" id="invia">Pubblica</button>
+      </div>
+      <div class="err" id="nuovo-err"></div>
+      <p class="regole">Il messaggio è pubblico, con il tuo nome Tavolata. Non scrivere dati personali (telefono, indirizzo, email). I messaggi offensivi o pubblicitari vengono cancellati.</p>`;
+    $('nuovo-t').value = bozza; aggiornaConta();
+    $('nuovo-t').addEventListener('input', aggiornaConta);
+    $('invia').addEventListener('click', () => invia($('nuovo-t'), null, $('nuovo-err'), $('nuovo-arg').value));
+  }
+  function aggiornaConta() { const t = $('nuovo-t'); if (t) $('conta').textContent = t.value.length + '/' + MAX; }
+
+  /* ---------- scrivere e cancellare ---------- */
+  async function invia(area, su, errEl, gioco) {
+    const testo = (area.value || '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    errEl.textContent = '';
+    if (!testo) { errEl.textContent = tr('Scrivi qualcosa prima di pubblicare.'); return; }
+    if (testo.length > MAX) { errEl.textContent = tr('Il messaggio è troppo lungo.'); return; }
+    const attesa = Math.ceil((ultimoInvio + PAUSA - Date.now()) / 1000);
+    if (attesa > 0) { errEl.textContent = tr('Aspetta qualche secondo prima di scrivere di nuovo.'); return; }
+    const u = T.google.utente(); const c = T.conto();
+    if (!u || !F) return;
+    const d = { uid: u.uid, nome: (c.nome || 'Giocatore').slice(0, 20), testo, t: F.fs.serverTimestamp(), lingua: T.lingua };
+    if (c.emoji) d.emoji = c.emoji;
+    if (/^#[0-9a-f]{6}$/i.test(c.colore || '')) d.colore = c.colore;
+    if (su) d.su = su; else if (gioco && gioco !== 'generale') d.gioco = gioco;
+    if (sonoStaff) d.staff = true;
+    const bottoni = document.querySelectorAll('#invia, [data-az="invia-risp"]'); bottoni.forEach(b => b.disabled = true);
+    try {
+      await F.fs.addDoc(F.fs.collection(F.db, 'bacheca'), d);
+      ultimoInvio = Date.now();
+      area.value = ''; aggiornaConta();
+      if (su) aperta = null;
+      T.avviso(su ? '✅ Risposta pubblicata' : '✅ Messaggio pubblicato');
+      disegnaLista();
+    } catch (e) {
+      console.warn('bacheca', e);
+      errEl.textContent = tr(/permission/i.test(e && e.code || '') ? 'Non è stato possibile pubblicare il messaggio.' : 'Problema di connessione: riprova tra poco.');
+    } finally { bottoni.forEach(b => b.disabled = false); }
+  }
+  function cancella(id) {
+    const m = msgs.find(x => x.id === id); if (!m || !F) return;
+    T.conferma('Cancellare il messaggio?', m.su ? 'La risposta sparisce per tutti.' : 'Il messaggio sparisce per tutti, insieme alle risposte che puoi cancellare.', 'Cancella', async () => {
+      try {
+        const figli = msgs.filter(x => x.su === id && puoCancellare(x));
+        await Promise.all(figli.map(x => F.fs.deleteDoc(F.fs.doc(F.db, 'bacheca', x.id)).catch(() => { })));
+        await F.fs.deleteDoc(F.fs.doc(F.db, 'bacheca', id));
+        T.avviso('🗑️ Messaggio cancellato');
+      } catch (e) { console.warn('bacheca', e); T.avviso('Non è stato possibile cancellare il messaggio.'); }
+    });
+  }
+  $('lista').addEventListener('click', e => {
+    const b = e.target.closest('[data-az]'); if (!b) return;
+    const az = b.dataset.az, id = b.dataset.id;
+    if (az === 'rispondi') { aperta = id; disegnaLista(); const t = $('risp-t'); if (t) t.focus(); }
+    else if (az === 'chiudi') { aperta = null; disegnaLista(); }
+    else if (az === 'invia-risp') invia($('risp-t'), id, $('risp-err'));
+    else if (az === 'cancella') cancella(id);
+  });
+
+  /* ---------- chi sono ---------- */
+  async function controllaStaff() {
+    const u = T.google.utente(); let s = false;
+    if (u && u.email && window.crypto && crypto.subtle) {
+      try { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(u.email.toLowerCase())); s = STAFF.includes([...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join('')); } catch (e) { }
+    }
+    if (s !== sonoStaff) { sonoStaff = s; }
+    disegnaScrivi(); disegnaLista();
+  }
+  addEventListener('tavolata:google', () => controllaStaff());
+  addEventListener('tavolata:profilo', () => disegnaScrivi());
+
+  /* ---------- avvio: legge i messaggi in tempo reale ---------- */
+  disegnaFiltro();
+  (async () => {
+    F = await T.google.database();
+    if (!F) { erroreLettura = 'Non riesco a caricare i messaggi: controlla la connessione e ricarica la pagina.'; disegnaLista(); disegnaScrivi(); return; }
+    const q = F.fs.query(F.fs.collection(F.db, 'bacheca'), F.fs.orderBy('t', 'desc'), F.fs.limit(300));
+    F.fs.onSnapshot(q, { includeMetadataChanges: false }, snap => {
+      erroreLettura = '';
+      msgs = snap.docs.map(d => { const x = d.data({ serverTimestamps: 'estimate' }); return Object.assign({}, x, { id: d.id, t: x.t && x.t.toMillis ? x.t.toMillis() : Date.now() }); })
+        .filter(m => typeof m.testo === 'string' && typeof m.nome === 'string');
+      disegnaLista();
+    }, e => { console.warn('bacheca', e); erroreLettura = 'Non riesco a caricare i messaggi: controlla la connessione e ricarica la pagina.'; disegnaLista(); });
+    controllaStaff();
+  })();
+  disegnaScrivi();
+  setInterval(disegnaLista, 60000);   // aggiorna "5 min fa"
+})();
+</script>
+</body>
+</html>

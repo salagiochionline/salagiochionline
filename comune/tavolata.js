@@ -44,6 +44,142 @@
   ];
   const GIOCO = id => GIOCHI.find(g => g.id === id) || null;
 
+  /* =========================================================
+     LINGUE (dal 24/11/2026)
+     Il sito è scritto in italiano. In un'altra lingua il modulo traduce
+     il testo che compare sulla pagina usando i dizionari in
+     lingue/<lingua>/comune.js + lingue/<lingua>/<pagina>.js
+     (pagina = cartella del gioco, "home", "profilo", "privacy", "bacheca").
+     Un dizionario fa: (window.TV_LINGUA = window.TV_LINGUA || []).push({
+       lingua: 'en', testi: { 'Testo italiano': 'English text', … },
+       schemi: [[/^Turno di (.+)$/, 'Turn: $1'], [/^(\d+) punti$/, (m, n) => n + ' points'], …] });
+     Le chiavi si confrontano senza spazi doppi; emoji e simboli all'inizio
+     e la punteggiatura alla fine restano quelli dell'originale.
+     Non si traduce: <script>, <style>, <textarea>, campi di testo, e
+     tutto ciò che sta dentro translate="no" o class="tv-notr" (nomi, chat…).
+     ========================================================= */
+  const LINGUE = { it: 'Italiano', en: 'English' };
+  const BANDIERE = { it: '🇮🇹', en: '🇬🇧' };
+  const LINGUA = (() => {
+    try { const q = new URLSearchParams(location.search).get('lingua'); if (q && LINGUE[q]) { localStorage.setItem('tavolata-lingua', q); return q; } } catch (e) { }
+    try { const s = localStorage.getItem('tavolata-lingua'); if (s && LINGUE[s]) return s; } catch (e) { }
+    const L = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || 'it'];
+    for (const l of L) { const c = String(l).slice(0, 2).toLowerCase(); if (LINGUE[c]) return c; }
+    return 'en';
+  })();
+  const PAGINA = (() => {
+    try { const base = new URL(BASE).pathname; const p = location.pathname; const r = p.startsWith(base) ? p.slice(base.length) : p.replace(/^\//, ''); return (r.split('/')[0] || 'home').replace(/\.html?$/, '').replace(/^index$/, 'home') || 'home'; } catch (e) { return 'home'; }
+  })();
+  const TR = { on: LINGUA !== 'it', testi: new Map(), schemi: [], letti: 0, cache: new Map(), pronto: false };
+  const trNorm = s => s.replace(/\s+/g, ' ').trim();
+  function trCarica() {
+    const a = window.TV_LINGUA || [];
+    if (TR.letti === a.length) return;
+    while (TR.letti < a.length) {
+      const d = a[TR.letti++]; if (!d || d.lingua !== LINGUA) continue;
+      for (const k in (d.testi || {})) TR.testi.set(trNorm(k), d.testi[k]);
+      (d.schemi || []).forEach(s => TR.schemi.push(s));
+    }
+    TR.cache.clear();
+  }
+  function trNucleo(t) {
+    let r = TR.testi.get(t);
+    if (r != null) return r;
+    for (const [re, rep] of TR.schemi) {
+      const m = t.match(re);
+      if (m && m[0] === t) return typeof rep === 'function' ? rep.apply(null, m.concat([trFrase])) : t.replace(re, rep);
+    }
+    return null;
+  }
+  /* traduce una frase: null se non la conosce */
+  function trFrase(s) {
+    if (!TR.on || s == null) return null;
+    const t = trNorm(String(s));
+    if (!t || !/\p{L}/u.test(t)) return null;
+    if (TR.cache.has(t)) return TR.cache.get(t);
+    let r = trNucleo(t);
+    if (r == null) {
+      /* simboli/emoji davanti e punteggiatura in fondo restano dell'originale */
+      const m = t.match(/^([^\p{L}\p{N}¿¡]*)(.*?)([\s:!?.…,;)\]»"]*)$/su);
+      if (m && (m[1] || m[3])) {
+        let c = trNucleo(m[2]);
+        if (c == null && m[3]) { const c2 = trNucleo(m[2] + m[3]); if (c2 != null) { c = c2; m[3] = ''; } }
+        if (c == null && m[1]) { const c3 = trNucleo((m[2] + m[3]).trim()); if (c3 != null) { c = c3; m[3] = ''; } }
+        if (c != null) r = m[1] + c + m[3];
+      }
+    }
+    if (TR.cache.size > 4000) TR.cache.clear();
+    TR.cache.set(t, r);
+    return r;
+  }
+  /* traduce un testo (anche su più righe); se non lo conosce lo lascia com'è */
+  function traduci(s) {
+    if (!TR.on || s == null) return s;
+    s = String(s);
+    if (s.includes('\n')) return s.split('\n').map(x => traduci(x)).join('\n');
+    const r = trFrase(s); if (r == null) return s;
+    return (s.match(/^\s*/)[0]) + r + (s.match(/\s*$/)[0]);
+  }
+  const TR_SALTA = /^(SCRIPT|STYLE|TEXTAREA|NOSCRIPT|CODE|PRE)$/;
+  const TR_ATTR = ['placeholder', 'title', 'aria-label', 'alt'];
+  function trSalta(el) { return TR_SALTA.test(el.tagName) || el.getAttribute('translate') === 'no' || (el.classList && el.classList.contains('tv-notr')) || el.isContentEditable; }
+  function trFuori(n) { const p = n.nodeType === 1 ? n : n.parentElement; return !p || !!p.closest('[translate="no"],.tv-notr,script,style,textarea,noscript,code,pre,[contenteditable="true"]'); }
+  function trTesto(n) {
+    const v = n.nodeValue; if (!v || v.length > 2000 || !/\p{L}/u.test(v)) return;
+    const r = traduci(v); if (r !== v) n.nodeValue = r;
+  }
+  function trAttr(el) {
+    for (const a of TR_ATTR) { const v = el.getAttribute(a); if (v) { const r = traduci(v); if (r !== v) el.setAttribute(a, r); } }
+    if (el.tagName === 'INPUT' && /^(button|submit|reset)$/i.test(el.type) && el.value) { const r = traduci(el.value); if (r !== el.value) el.value = r; }
+  }
+  function trAlbero(root) {
+    if (!TR.on || !root) return;
+    trCarica();
+    if (root.nodeType === 3) { if (!trFuori(root)) trTesto(root); return; }
+    if (root.nodeType !== 1 && root.nodeType !== 9) return;
+    const el = root.nodeType === 9 ? root.documentElement : root;
+    if (trFuori(el) && el !== document.documentElement) return;
+    trAttr(el);
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeType === 1 && trSalta(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    let n; while ((n = w.nextNode())) { if (n.nodeType === 3) trTesto(n); else trAttr(n); }
+  }
+  function trAvvia() {
+    document.documentElement.lang = LINGUA;
+    try { document.documentElement.classList.add('tv-trad'); } catch (e) { }
+    const st = document.createElement('style'); st.textContent = 'html.tv-trad body{visibility:hidden}'; (document.head || document.documentElement).appendChild(st);
+    /* i dizionari: caricati subito, prima che la pagina finisca di comparire */
+    const files = [BASE + 'lingue/' + LINGUA + '/comune.js', BASE + 'lingue/' + LINGUA + '/' + PAGINA + '.js'];
+    if (document.readyState === 'loading') files.forEach(f => document.write('<script src="' + f + '" onerror="0"><\/script>'));
+    else files.forEach(f => { const s = document.createElement('script'); s.src = f; s.onload = () => trAlbero(document); document.head.appendChild(s); });
+    new MutationObserver(lista => {
+      if (!TR.on) return;
+      trCarica();
+      for (const m of lista) {
+        if (m.type === 'childList') m.addedNodes.forEach(n => trAlbero(n));
+        else if (m.type === 'characterData') { if (!trFuori(m.target)) trTesto(m.target); }
+        else if (m.type === 'attributes' && !trFuori(m.target)) trAttr(m.target);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: TR_ATTR.concat(['value']) });
+    const mostra = () => { trAlbero(document); TR.pronto = true; document.documentElement.classList.remove('tv-trad'); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mostra); else setTimeout(mostra, 0);
+    setTimeout(() => document.documentElement.classList.remove('tv-trad'), 2500);   // in ogni caso, mai pagina vuota
+    /* finestre del browser (alert / confirm / prompt) */
+    ['alert', 'confirm'].forEach(f => { const o = window[f]; if (o) window[f] = function (m) { return o.call(window, traduci(m)); }; });
+    const op = window.prompt; if (op) window.prompt = function (m, d) { return op.call(window, traduci(m), d); };
+  }
+  /* blocchi scritti a mano per ogni lingua: <div data-lingua="en">…</div> (si vede solo in quella lingua) */
+  try { const st = document.createElement('style'); st.textContent = '[data-lingua]:not([data-lingua="' + LINGUA + '"]){display:none!important}'; (document.head || document.documentElement).appendChild(st); } catch (e) { }
+  if (TR.on) trAvvia(); else try { document.documentElement.classList.remove('tv-trad'); } catch (e) { }
+  function linguaHTML(cls) {
+    return `<select class="tv-lingua ${cls || ''}" translate="no" aria-label="Lingua / Language" title="Lingua / Language">${Object.keys(LINGUE).map(l => `<option value="${l}"${l === LINGUA ? ' selected' : ''}>${BANDIERE[l] || ''} ${LINGUE[l]}</option>`).join('')}</select>`;
+  }
+  document.addEventListener('change', e => {
+    const s = e.target.closest && e.target.closest('select.tv-lingua'); if (!s) return;
+    try { localStorage.setItem('tavolata-lingua', s.value); } catch (e) { }
+    let u = location.href.replace(/([?&])lingua=[a-z]+&?/, '$1').replace(/[?&]$/, '');
+    if (u === location.href) location.reload(); else location.replace(u);
+  });
+
   /* ---------------- piccoli aiuti ---------------- */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ALF = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -67,7 +203,7 @@
   } : null;
   const codiceAmico = id => (id || '').replace(/^u-/, '').replace(/^(....)(....)$/, '$1-$2');
   const idDaCodice = s => { const x = String(s || '').toUpperCase().replace(/^.*[#/]/, '').replace(/^U-/, '').replace(/[^A-Z0-9]/g, ''); return /^[A-Z0-9]{8}$/.test(x) && [...x].every(c => ALF.includes(c)) ? 'u-' + x : null; };
-  const quando = t => { const s = Math.round((Date.now() - t) / 1000); if (s < 60) return 'adesso'; const m = Math.round(s / 60); if (m < 60) return m + ' min fa'; const h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? ' ora fa' : ' ore fa'); return new Date(t).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }); };
+  const quando = t => { const s = Math.round((Date.now() - t) / 1000); if (s < 60) return 'adesso'; const m = Math.round(s / 60); if (m < 60) return m + ' min fa'; const h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? ' ora fa' : ' ore fa'); return new Date(t).toLocaleDateString(LINGUA === 'it' ? 'it-IT' : LINGUA, { day: 'numeric', month: 'short' }); };
 
   /* =========================================================
      ACCOUNT (sul dispositivo)
@@ -987,7 +1123,13 @@
   .tv-stanze-vuote{padding:10px 2px}
   @media (prefers-reduced-motion:reduce){.tv-card,.tv-dr{animation:none!important;transition:none!important}}
   
-.tv-dona-riga{margin-top:8px}
+.tv-dona-riga{margin-top:8px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+.tv-lingua{font:700 13px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;color:#f4f1ff;background:rgba(255,255,255,.08) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23f4f1ff' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 28px 8px 12px;cursor:pointer;-webkit-appearance:none;appearance:none}
+.tv-lingua:hover{border-color:rgba(255,255,255,.35)}
+.tv-lingua option{background:#262240;color:#f4f1ff}
+.tv-bach-link{display:inline-block;padding:6px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.2);color:inherit !important;text-decoration:none;font:700 12.5px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif}
+.tv-bach-link:hover{border-color:rgba(255,255,255,.4)}
+.tv-lingua-sm{padding:6px 26px 6px 10px;font-size:12.5px}
 .tv-dona{display:inline-block;padding:7px 14px;border-radius:999px;background:#ffcf4a;color:#1d1a2f !important;font:800 12.5px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;text-decoration:none;border:0;cursor:pointer;opacity:1}
 .tv-dona-sm{display:inline-flex;align-items:center;padding:6px 12px;font-size:13px;box-shadow:0 3px 0 #c99a17;white-space:nowrap}
 .tv-dona:hover{filter:brightness(1.06)}
@@ -1173,7 +1315,7 @@
     const n = nonLette(), on = quantiOnline();
     return `<button class="tv-chi" data-tv="conto">${avatarHTML(C.id, 40)}<span><b>${esc(C.nome || 'Scegli il tuo nome')}</b><small>${A.lista.length ? (on ? `🟢 ${on} ${on === 1 ? 'amico online' : 'amici online'}` : `${A.lista.length} ${A.lista.length === 1 ? 'amico' : 'amici'} · nessuno online`) : 'Aggiungi gli amici per invitarli a giocare'}</small></span></button>
       <button class="tv-btn tv-sm" data-tv="conto">👥 Amici ${n ? `<span class="tv-badge">${n}</span>` : ''}</button>
-      <a class="tv-btn tv-sm" href="${BASE}profilo/${QS}">📊 Profilo</a>${donaBreveHTML()}`;
+      <a class="tv-btn tv-sm" href="${BASE}profilo/${QS}">📊 Profilo</a>${donaBreveHTML()}${linguaHTML('tv-lingua-sm')}`;
   }
   /* ---- partite pubbliche in avvio ---- */
   function stanzeAttive(gioco) {
@@ -1281,7 +1423,7 @@
       rq = false;
       if (!document.body) return;
       stile();
-      const b = document.getElementById('tv-barra'); if (b) b.innerHTML = barraHTML();
+      const b = document.getElementById('tv-barra'); if (b) { const h = barraHTML(); if (b.dataset.h !== hashStr(h)) { b.dataset.h = hashStr(h); b.innerHTML = h; } }
       const pl = document.getElementById('tv-pubbliche-l'); if (pl) pl.innerHTML = stanzeHTML(G ? G.id : null);
       const ps = document.getElementById('tv-stanza'); if (ps) { const h = stanzaHTML(); if (ps.dataset.h !== hashStr(h)) { ps.dataset.h = hashStr(h); ps.innerHTML = h; } }
       const conto = document.getElementById('tv-conto'); if (conto) conto.innerHTML = `<button class="tv-btn" data-tv="conto" style="padding:5px 12px 5px 5px;border-radius:99px">${avatarHTML(C.id, 34)}<span>${esc(C.nome || 'Il mio profilo')}</span>${nonLette() ? `<span class="tv-badge">${nonLette()}</span>` : quantiOnline() ? `<span class="tv-small tv-on">● ${quantiOnline()}</span>` : ''}</button>`;
@@ -1335,9 +1477,11 @@
   function mettiDona() {
     /* le pagine possono preparare un posto: <span class="tv-dona-slot" data-testo="…"></span> */
     document.querySelectorAll('.tv-dona-slot').forEach(f => { if (!f.firstChild) f.innerHTML = donaBreveHTML(f.dataset.testo); });
+    document.querySelectorAll('.tv-lingua-slot').forEach(f => { if (!f.firstChild) f.innerHTML = linguaHTML(f.dataset.cls); });
     document.querySelectorAll('.tv-copy, .tv-copy-home').forEach(f => {
       if (f.querySelector('.tv-dona')) return;
-      const d = document.createElement('div'); d.className = 'tv-dona-riga'; d.innerHTML = donaHTML(); f.appendChild(d);
+      const bach = PAGINA !== 'bacheca' ? ` <a class="tv-bach-link" href="${BASE}bacheca/${GIOCO(PAGINA) ? '?gioco=' + PAGINA : ''}">💬 Domande e commenti</a>` : '';
+      const d = document.createElement('div'); d.className = 'tv-dona-riga'; d.innerHTML = donaHTML() + bach + (f.classList.contains('tv-copy') ? ' ' + linguaHTML('tv-lingua-sm') : ''); f.appendChild(d);
     });
   }
   /* conta le visite solo sul sito vero (non nelle prove in locale né sul vecchio indirizzo) */
@@ -1394,6 +1538,12 @@
     online, statoAmico, linkDispositivo, collegaDa, codiceAmico, idDaCodice, EMOJI, COLORI, BASE, QS,
     collegato: () => Net.ok, esc, quando, render,
     kofi: KOFI, donaHTML: donaBreveHTML,
-    google: { stato: ggStato, accedi: ggAccedi, esci: ggEsci, elimina: ggElimina, salva: ggInvia, prepara: ggCarica, html: ggHTML }
+    lingua: LINGUA, lingue: Object.assign({}, LINGUE), t: traduci, linguaHTML, traduciPagina: () => trAlbero(document),
+    google: {
+      stato: ggStato, accedi: ggAccedi, esci: ggEsci, elimina: ggElimina, salva: ggInvia, prepara: ggCarica, html: ggHTML,
+      /* per altre pagine (es. la bacheca): Firestore già pronto e l'utente Google attuale */
+      database: async () => { const ok = await ggCarica(); return ok && GG.m ? { fs: GG.m.fs, db: GG.db } : null; },
+      utente: () => GG.user ? { uid: GG.user.uid, email: GG.user.email || '', nome: GG.user.displayName || '' } : null
+    }
   };
 })();

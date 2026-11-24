@@ -34,13 +34,15 @@
   a{color:var(--yellow)}
   .back{display:inline-block;margin-top:6px;padding:8px 14px;border-radius:999px;background:var(--card-hi);color:var(--text);text-decoration:none;font-weight:700}
 </style>
+<script>/* lingua: nasconde la pagina finché non è tradotta (vedi comune/tavolata.js) */try{var tvL=new URLSearchParams(location.search).get('lingua')||localStorage.getItem('tavolata-lingua')||(navigator.languages&&navigator.languages[0])||navigator.language||'it';if(!/^it/i.test(tvL))document.documentElement.className+=' tv-trad'}catch(e){}</script><style>html.tv-trad body{visibility:hidden}</style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <a class="brand" href="../"><span class="brand-mark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="brand-name">Tavolata</span></a>
-    <a class="back" href="../">🎲 Tutti i giochi</a>
+    <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tv-lingua-slot"></span><a class="back" href="../">🎲 Tutti i giochi</a></span>
   </header>
+<div data-lingua="it">
   <h1>Privacy</h1>
   <p class="mut" style="margin-top:8px">In parole semplici: quali dati usa Tavolata e dove finiscono. Ultimo aggiornamento: 24 novembre 2026.</p>
 
@@ -86,6 +88,16 @@
   </div>
 
   <div class="card">
+    <h2>💬 Bacheca (domande e commenti)</h2>
+    <p>Per scrivere nella <a href="../bacheca/">bacheca</a> serve l'accesso con Google. Quello che scrivi è <b>pubblico</b>: tutti vedono il messaggio, il tuo nome Tavolata e l'emoji o il colore del profilo, insieme alla data. L'email del tuo account Google non viene mostrata.</p>
+    <ul>
+      <li>I messaggi sono salvati su Firebase (Google).</li>
+      <li>Puoi cancellare i tuoi messaggi quando vuoi. Cancelliamo i messaggi offensivi, pubblicitari o con dati personali.</li>
+      <li><b>Non scrivere dati personali</b> (telefono, indirizzo, email).</li>
+    </ul>
+  </div>
+
+  <div class="card">
     <h2>☕ Donazioni</h2>
     <p>Le donazioni sono facoltative e passano da Ko-fi e PayPal, che trattano i pagamenti secondo le loro regole sulla privacy. Noi vediamo solo quello che scegli di condividere (per esempio il nome e un messaggio).</p>
   </div>
@@ -107,6 +119,85 @@
     <h2>✋ I tuoi diritti</h2>
     <p>Puoi chiederci quali dati abbiamo su di te, correggerli o cancellarli. Gran parte la gestisci da solo: cambiando nome e foto nel profilo, cancellando i dati da Google o i dati del sito nel tuo browser. Per il resto, scrivici dalla <a href="https://ko-fi.com/tavolatateam" target="_blank" rel="noopener">pagina Ko-fi</a>.</p>
   </div>
+</div>
+<div data-lingua="en" translate="no" lang="en">
+  <h1>Privacy</h1>
+  <p class="mut" style="margin-top:8px">In plain words: what data Tavolata uses and where it goes. Last updated: 24 November 2026.</p>
+
+  <div class="card">
+    <h2>👋 Who we are</h2>
+    <p>Tavolata is a hobby project for playing board games online with friends. We don't sell data, we don't show ads and we don't use profiling cookies.</p>
+    <p>For questions or requests about your data you can write to us from the <a href="https://ko-fi.com/tavolatateam" target="_blank" rel="noopener">Tavolata Ko-fi page</a>.</p>
+  </div>
+
+  <div class="card">
+    <h2>📱 On your device</h2>
+    <p>Your Tavolata account is created on your device, with no email or password. The browser (the site's local storage) keeps: your account code, name, photo or emoji, colour, friends, game stats, your language and a few preferences.</p>
+    <p>If you clear the site's data from your browser, this data disappears from that device.</p>
+  </div>
+
+  <div class="card">
+    <h2>🌐 The game server</h2>
+    <p>To play together, the site uses a free public messaging server (EMQX, broker.emqx.io). The following goes through it: the name and photo you choose, when you're online, invites, game moves and chat.</p>
+    <ul>
+      <li>Friends and stats travel <b>encrypted</b>: only your devices can read them.</li>
+      <li>The rest (name, photo, moves, chat) could be seen by someone who knows the server's technical addresses: <b>don't share personal details in chat</b>, such as phone numbers or addresses.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>☁️ Sign in with Google (optional)</h2>
+    <p>If you choose "Sign in with Google", we use Firebase, a Google service, to recognise you and to save a copy of your account (name, photo, friends, stats) that you can find again on other devices.</p>
+    <ul>
+      <li>Google tells us your email address and the name of your Google account: they're only used to recognise you and <b>are not shown to anyone</b>. We never see your password.</li>
+      <li>Only you can read and change the saved data.</li>
+      <li>From the <a href="../profilo/">My profile</a> page you can sign out of Google or <b>delete the saved data</b> whenever you want.</li>
+    </ul>
+    <p>If you don't sign in with Google you can play normally: nothing is saved on Firebase.</p>
+  </div>
+
+  <div class="card">
+    <h2>📈 Visit statistics</h2>
+    <p>To know how many people use the site we use Cloudflare Web Analytics, the statistics service of Cloudflare (which hosts the site). It anonymously counts the pages visited, the type of device and the country of origin.</p>
+    <ul>
+      <li><b>It uses no cookies</b> and stores nothing on your device.</li>
+      <li>It doesn't follow you on other sites and isn't used to show you ads.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>💬 Message board (questions and comments)</h2>
+    <p>To write on the <a href="../bacheca/">message board</a> you need to sign in with Google. What you write is <b>public</b>: everyone can see the message, your Tavolata name and your profile emoji or colour, together with the date. Your Google account email is not shown.</p>
+    <ul>
+      <li>Messages are stored on Firebase (Google).</li>
+      <li>You can delete your messages whenever you want. We delete messages that are offensive, advertising or contain personal data.</li>
+      <li><b>Don't post personal details</b> (phone, address, email).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>☕ Donations</h2>
+    <p>Donations are optional and go through Ko-fi and PayPal, which handle payments under their own privacy rules. We only see what you choose to share (for example your name and a message).</p>
+  </div>
+
+  <div class="card">
+    <h2>🔧 Technical services</h2>
+    <ul>
+      <li><b>Hosting:</b> the site is hosted by Cloudflare (and, until the move is complete, by GitHub Pages), which records technical data such as your IP address to make it work.</li>
+      <li><b>Fonts:</b> the page fonts come from Google Fonts, which receives your device's IP address.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🧒 Young people</h2>
+    <p>If you are under 14, use Tavolata with your parents' permission. Signing in with Google requires your own Google account: without one you can still play.</p>
+  </div>
+
+  <div class="card">
+    <h2>✋ Your rights</h2>
+    <p>You can ask us what data we hold about you, and have it corrected or deleted. You can manage most of it yourself: by changing your name and photo in your profile, deleting your data from Google or clearing the site's data in your browser. For anything else, write to us from the <a href="https://ko-fi.com/tavolatateam" target="_blank" rel="noopener">Ko-fi page</a>.</p>
+  </div>
+</div>
 </div>
 <style>.tv-copy{max-width:900px;margin:28px auto 0;padding:14px 16px 24px;text-align:center;font:12px/1.55 system-ui,sans-serif;color:#a9a3c9;opacity:.8}.tv-copy a{color:inherit}</style>
 <footer class="tv-copy">© 2026 Tavolata · Tutti i diritti riservati<br>Progetto amatoriale: i nomi e i marchi dei giochi originali appartengono ai rispettivi proprietari.</footer>

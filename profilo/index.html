@@ -68,12 +68,13 @@
   @media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.me{grid-template-columns:minmax(0,1fr);justify-items:start}}
   .warn{color:#ffb4b4}
 </style>
+<script>/* lingua: nasconde la pagina finché non è tradotta (vedi comune/tavolata.js) */try{var tvL=new URLSearchParams(location.search).get('lingua')||localStorage.getItem('tavolata-lingua')||(navigator.languages&&navigator.languages[0])||navigator.language||'it';if(!/^it/i.test(tvL))document.documentElement.className+=' tv-trad'}catch(e){}</script><style>html.tv-trad body{visibility:hidden}</style>
 </head>
 <body data-tv-pagina="profilo">
 <div class="wrap">
   <header>
     <a class="brand" href="../" aria-label="Tavolata, tutti i giochi"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="brand-name">Tavolata</span></a>
-    <div class="row"><a class="tv-btn" id="hub" href="../">🎲 Tutti i giochi</a><button class="tv-btn" data-tv="conto">👥 Amici</button></div>
+    <div class="row"><span class="tv-lingua-slot"></span><a class="tv-btn" id="hub" href="../">🎲 Tutti i giochi</a><button class="tv-btn" data-tv="conto">👥 Amici</button></div>
   </header>
   <main id="pagina"><div class="card mut">Caricamento…</div></main>
 </div>
@@ -140,7 +141,7 @@ function recentiHTML() {
   T.GIOCHI.forEach(g => T.partiteDi(g, nomi).slice(0, 12).forEach(r => tutte.push([g, r])));
   tutte.sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
   if (!tutte.length) return '';
-  return `<div class="card"><h2>🕒 Ultime partite</h2><div class="recent">${tutte.slice(0, 12).map(([g, r]) => { const [tx, cl] = esito(r); return `<div class="r"><div class="ic" style="background:${g.colore}33">${g.ico}</div><div class="t"><b>${esc(g.nome)}</b><br><small>${new Date(r.t).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${r.n ? ' · ' + r.n + ' giocatori' : ''}${r.winner && !r.won ? ' · ha vinto ' + esc(r.winner) : ''}</small></div><span class="res ${cl}">${tx}</span></div>`; }).join('')}</div></div>`;
+  return `<div class="card"><h2>🕒 Ultime partite</h2><div class="recent">${tutte.slice(0, 12).map(([g, r]) => { const [tx, cl] = esito(r); return `<div class="r"><div class="ic" style="background:${g.colore}33">${g.ico}</div><div class="t"><b>${esc(g.nome)}</b><br><small>${new Date(r.t).toLocaleDateString(T.lingua === 'it' ? 'it-IT' : T.lingua, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${r.n ? ' · ' + r.n + ' giocatori' : ''}${r.winner && !r.won ? ' · ha vinto ' + esc(r.winner) : ''}</small></div><span class="res ${cl}">${tx}</span></div>`; }).join('')}</div></div>`;
 }
 
 /* ---------------- il mio profilo ---------------- */
