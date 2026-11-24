@@ -986,7 +986,9 @@
   
 .tv-dona-riga{margin-top:8px}
 .tv-dona{display:inline-block;padding:7px 14px;border-radius:999px;background:#ffcf4a;color:#1d1a2f !important;font:800 12.5px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;text-decoration:none;border:0;cursor:pointer;opacity:1}
-.tv-dona-off{background:transparent;color:inherit !important;border:1px dashed currentColor;opacity:.75;font-weight:700}
+.tv-dona-sm{display:inline-flex;align-items:center;padding:6px 12px;font-size:13px;box-shadow:0 3px 0 #c99a17;white-space:nowrap}
+.tv-dona:hover{filter:brightness(1.06)}
+.tv-dona-off{box-shadow:none;background:transparent;color:inherit !important;border:1px dashed currentColor;opacity:.75;font-weight:700}
 `;
   function stile() { if (document.getElementById('tv-css')) return; const s = document.createElement('style'); s.id = 'tv-css'; s.textContent = CSS; document.head.appendChild(s); }
 
@@ -1168,7 +1170,7 @@
     const n = nonLette(), on = quantiOnline();
     return `<button class="tv-chi" data-tv="conto">${avatarHTML(C.id, 40)}<span><b>${esc(C.nome || 'Scegli il tuo nome')}</b><small>${A.lista.length ? (on ? `🟢 ${on} ${on === 1 ? 'amico online' : 'amici online'}` : `${A.lista.length} ${A.lista.length === 1 ? 'amico' : 'amici'} · nessuno online`) : 'Aggiungi gli amici per invitarli a giocare'}</small></span></button>
       <button class="tv-btn tv-sm" data-tv="conto">👥 Amici ${n ? `<span class="tv-badge">${n}</span>` : ''}</button>
-      <a class="tv-btn tv-sm" href="${BASE}profilo/${QS}">📊 Profilo</a>`;
+      <a class="tv-btn tv-sm" href="${BASE}profilo/${QS}">📊 Profilo</a>${donaBreveHTML()}`;
   }
   /* ---- partite pubbliche in avvio ---- */
   function stanzeAttive(gioco) {
@@ -1321,7 +1323,15 @@
       ? `<a class="tv-dona" href="${esc(KOFI)}" target="_blank" rel="noopener">☕ Ti piace Tavolata? Offrici un caffè su Ko-fi</a>`
       : `<button type="button" class="tv-dona tv-dona-off" data-tv="dona-presto" title="Le donazioni non sono ancora attive">☕ Sostieni Tavolata · presto disponibile</button>`;
   }
+  /* versione corta del pulsante, per le barre in alto (giochi e home) */
+  function donaBreveHTML(testo) {
+    return KOFI
+      ? `<a class="tv-dona tv-dona-sm" href="${esc(KOFI)}" target="_blank" rel="noopener" title="Sostieni Tavolata su Ko-fi">${esc(testo || '☕ Sostienici')}</a>`
+      : `<button type="button" class="tv-dona tv-dona-sm tv-dona-off" data-tv="dona-presto">☕ Presto</button>`;
+  }
   function mettiDona() {
+    /* le pagine possono preparare un posto: <span class="tv-dona-slot" data-testo="…"></span> */
+    document.querySelectorAll('.tv-dona-slot').forEach(f => { if (!f.firstChild) f.innerHTML = donaBreveHTML(f.dataset.testo); });
     document.querySelectorAll('.tv-copy, .tv-copy-home').forEach(f => {
       if (f.querySelector('.tv-dona')) return;
       const d = document.createElement('div'); d.className = 'tv-dona-riga'; d.innerHTML = donaHTML(); f.appendChild(d);
@@ -1371,6 +1381,7 @@
     seguiProfilo: id => { chiediProfilo(id); sub('presenza/' + id); },
     online, statoAmico, linkDispositivo, collegaDa, codiceAmico, idDaCodice, EMOJI, COLORI, BASE, QS,
     collegato: () => Net.ok, esc, quando, render,
+    kofi: KOFI, donaHTML: donaBreveHTML,
     google: { stato: ggStato, accedi: ggAccedi, esci: ggEsci, elimina: ggElimina, salva: ggInvia, prepara: ggCarica, html: ggHTML }
   };
 })();

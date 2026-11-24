@@ -54,6 +54,8 @@
   /* ---------- header ---------- */
   header{padding:28px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
   #tv-conto:empty{display:none}
+  .head-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .head-r .tv-dona-sm{padding:9px 16px;font-size:14px}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;width:max-content}
   .brand-mark{
     width:44px;height:44px;border-radius:13px;background:var(--yellow);
@@ -99,6 +101,59 @@
   }
   .filters button:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
   .filters button[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+  /* ---------- ricerca ---------- */
+  .search{position:relative;margin:0 0 16px}
+  .search svg{position:absolute;left:16px;top:50%;width:20px;height:20px;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  .search input{
+    width:100%;font:inherit;font-size:1.05rem;font-weight:600;color:var(--text);
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:14px 46px 14px 48px;outline:none;transition:border-color .15s, box-shadow .15s;
+  }
+  .search input::placeholder{color:var(--muted);font-weight:600}
+  .search input:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,207,74,.18)}
+  .search input::-webkit-search-cancel-button{display:none}
+  .search .clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text);font-size:1rem;display:none}
+  .search.has .clear{display:block}
+
+  /* ---------- schermata iniziale ---------- */
+  #intro{
+    position:fixed;inset:0;z-index:9000;overflow-y:auto;
+    display:flex;align-items:center;justify-content:center;padding:28px 20px;
+    background:
+      radial-gradient(520px 380px at 10% 5%, rgba(255,107,107,.22), transparent 70%),
+      radial-gradient(560px 420px at 95% 15%, rgba(77,171,247,.2), transparent 70%),
+      radial-gradient(620px 460px at 50% 105%, rgba(255,207,74,.18), transparent 70%),
+      var(--bg);
+    transition:opacity .35s, transform .35s;
+  }
+  #intro::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;background-image:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);background-size:22px 22px}
+  #intro.via{opacity:0;transform:scale(1.03);pointer-events:none}
+  .intro-box{position:relative;z-index:1;width:min(420px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+  .intro-box .brand-mark{width:84px;height:84px;border-radius:24px;padding:15px;box-shadow:0 9px 0 #c99a17;animation:dondola 3.5s ease-in-out infinite}
+  .intro-box .brand-mark i{width:13px;height:13px}
+  @keyframes dondola{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(6deg) translateY(-4px)}}
+  .intro-box h1{font-family:"Fredoka",sans-serif;font-weight:700;font-size:clamp(3.2rem,13vw,5rem);line-height:1;letter-spacing:-.5px;margin-top:10px}
+  .intro-box .sub{color:var(--muted);font-size:1.08rem;margin:-4px 0 14px}
+  .intro-btns{display:flex;flex-direction:column;gap:12px;width:100%}
+  .intro-btns > *{width:100%}
+  .big{
+    display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+    font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.2rem;
+    padding:15px 18px;border-radius:16px;border:0;cursor:pointer;text-decoration:none;
+    transition:transform .12s, box-shadow .12s, filter .15s;
+  }
+  .big:active{transform:translateY(3px)}
+  .big.go{background:var(--yellow);color:var(--bg);box-shadow:0 5px 0 #c99a17}
+  .big.go:active{box-shadow:0 2px 0 #c99a17}
+  #intro-g .tv-btn{width:100%;justify-content:center;padding:14px 18px;font-size:1.05rem;border-radius:16px}
+  #intro-g .tv-on{padding:12px;border-radius:14px;background:rgba(61,220,132,.1);border:1px solid rgba(61,220,132,.3)}
+  #intro-g:empty{display:none}
+  #intro .tv-dona-slot .tv-dona{width:100%;justify-content:center;padding:14px 18px;font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.08rem;border-radius:16px;background:transparent;color:var(--yellow)!important;border:2px solid rgba(255,207,74,.55);box-shadow:none}
+  #intro .tv-dona-slot .tv-dona:hover{background:rgba(255,207,74,.1)}
+  .intro-foot{color:var(--muted);font-size:.8rem;opacity:.8;margin-top:10px}
+  .intro-foot a{color:inherit}
+  html.con-intro body{overflow:hidden}
 
   /* ---------- griglia giochi ---------- */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;padding-bottom:30px}
@@ -188,6 +243,24 @@
 </style>
 </head>
 <body>
+<script>
+  /* schermata iniziale: una volta per sessione (non quando torni da un gioco) */
+  try { if (!sessionStorage.getItem('tv-intro') && !location.hash) document.documentElement.classList.add('con-intro'); } catch (e) { }
+</script>
+
+<div id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-t" hidden>
+  <div class="intro-box">
+    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <h1 id="intro-t">Tavolata</h1>
+    <p class="sub">I giochi da tavolo, online con gli amici.</p>
+    <div class="intro-btns">
+      <div id="intro-g"></div>
+      <button type="button" class="big go" id="intro-vai">🎲 Guarda i giochi</button>
+      <span class="tv-dona-slot" data-testo="☕ Sostieni Tavolata"></span>
+    </div>
+    <p class="intro-foot">© 2026 Tavolata · <a href="./privacy/">Privacy</a></p>
+  </div>
+</div>
 
 <div class="wrap">
   <header>
@@ -195,7 +268,10 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
       <span class="brand-name">Tavolata</span>
     </a>
-    <div id="tv-conto"></div>
+    <div class="head-r">
+      <span class="tv-dona-slot" data-testo="☕ Sostienici"></span>
+      <div id="tv-conto"></div>
+    </div>
   </header>
 
   <section class="hero">
@@ -216,6 +292,12 @@
   <div class="toolbar">
     <h2>Scegli a cosa giocare <span id="count"></span></h2>
     <div class="filters" role="group" aria-label="Filtra per tipo di gioco" id="filters"></div>
+  </div>
+
+  <div class="search" id="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input type="search" id="q" placeholder="Cerca un gioco… (es. carte, poker, dadi)" aria-label="Cerca un gioco" autocomplete="off" enterkeyhint="search">
+    <button type="button" class="clear" id="q-x" aria-label="Cancella la ricerca">✕</button>
   </div>
 
   <main class="grid" id="grid" aria-live="polite"></main>
@@ -646,6 +728,32 @@ const grid = document.getElementById("grid");
 const filtersEl = document.getElementById("filters");
 const countEl = document.getElementById("count");
 let filtroAttivo = "tutti";
+let cerca = "";
+const qEl = document.getElementById("q");
+const searchEl = document.getElementById("search");
+/* testo senza accenti e maiuscole, per cercare "citta" e trovare "Città" */
+const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, " ");
+/* parole in più per trovare i giochi anche con altri nomi */
+const SINONIMI = {
+  crazymonopolio: "monopoly proprieta case soldi banca",
+  ultima: "uno",
+  texas: "poker holdem fiches bluff",
+  blackjack: "21 ventuno banco",
+  yahtzee: "yahtzee",
+  navale: "navi flotta",
+  codice: "codenames spie",
+  chi: "indovina chi facce",
+  impostore: "spia bugiardo",
+  bunny: "mimo"
+};
+function testoRicerca(g){
+  return norm([g.nome, g.descrizione, etichettaTipo(g), tipiDi(g).join(" "), SINONIMI[g.icona] || "", SINONIMI[(g.url||"").replace(/[./]/g,"")] || ""].join(" "));
+}
+function corrisponde(g){
+  if (!cerca) return true;
+  const t = testoRicerca(g);
+  return norm(cerca).split(/\s+/).filter(Boolean).every(p => t.includes(p));
+}
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
@@ -678,10 +786,14 @@ function render(){
   // prima i giochi disponibili, poi quelli in arrivo
   const lista = GIOCHI
     .filter(g => filtroAttivo === "tutti" || tipiDi(g).includes(filtroAttivo))
+    .filter(corrisponde)
     .sort((a,b) => (!!b.url) - (!!a.url));
   grid.innerHTML = lista.length
     ? lista.map(cardHtml).join("")
-    : `<div class="empty">Nessun gioco in questa categoria… per ora!</div>`;
+    : cerca
+      ? `<div class="empty">Nessun gioco trovato per «${escapeHtml(cerca)}»${filtroAttivo !== "tutti" ? " in questa categoria" : ""}.<br><button type="button" class="tv-btn tv-sm" id="q-reset" style="margin-top:10px">Mostra tutti i giochi</button></div>`
+      : `<div class="empty">Nessun gioco in questa categoria… per ora!</div>`;
+  searchEl.classList.toggle("has", !!cerca);
   const disponibili = GIOCHI.filter(g => g.url).length;
   countEl.textContent = `· ${disponibili} ${disponibili === 1 ? "disponibile" : "disponibili"}, ${GIOCHI.length - disponibili} in arrivo`;
 }
@@ -702,8 +814,54 @@ filtersEl.addEventListener("click", e => {
   render();
 });
 
+qEl.addEventListener("input", () => { cerca = qEl.value.trim(); render(); });
+qEl.addEventListener("keydown", e => {
+  if (e.key === "Escape") { qEl.value = ""; cerca = ""; render(); }
+  if (e.key === "Enter") {   // Invio: apre il primo gioco trovato
+    e.preventDefault();
+    const primo = grid.querySelector("a.game");
+    if (cerca && primo) primo.click(); else qEl.blur();
+  }
+});
+document.getElementById("q-x").addEventListener("click", () => { qEl.value = ""; cerca = ""; render(); qEl.focus(); });
+grid.addEventListener("click", e => {
+  if (e.target.id === "q-reset") { qEl.value = ""; cerca = ""; filtroAttivo = "tutti"; renderFiltri(); render(); }
+});
+/* "/" da tastiera porta nella barra di ricerca */
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.documentElement.classList.contains("con-intro")) { e.preventDefault(); qEl.focus(); }
+});
+
 renderFiltri();
 render();
+
+/* ---------- schermata iniziale ---------- */
+(function(){
+  const intro = document.getElementById("intro");
+  if (!document.documentElement.classList.contains("con-intro")) { intro.remove(); return; }
+  intro.hidden = false;
+  const gBox = document.getElementById("intro-g");
+  function disegnaGoogle(){
+    const T = window.Tavolata; if (!T || !T.google) return;
+    const s = T.google.stato();
+    if (!disegnaGoogle.pre && s.stato !== "dentro") { disegnaGoogle.pre = true; T.google.prepara(); }  // così il popup di Google non viene bloccato
+    const h = T.google.html(s.stato === "dentro");
+    if (gBox.dataset.h !== h) { gBox.dataset.h = h; gBox.innerHTML = h; }
+  }
+  addEventListener("tavolata:google", disegnaGoogle);
+  const tGo = setInterval(disegnaGoogle, 800);
+  function entra(){
+    try { sessionStorage.setItem("tv-intro", "1"); } catch (e) { }
+    clearInterval(tGo);
+    intro.classList.add("via");
+    document.documentElement.classList.remove("con-intro");
+    setTimeout(() => intro.remove(), 400);
+    window.scrollTo(0, 0);
+  }
+  document.getElementById("intro-vai").addEventListener("click", entra);
+  intro.addEventListener("keydown", e => { if (e.key === "Escape") entra(); });
+  setTimeout(() => document.getElementById("intro-vai").focus({ preventScroll: true }), 50);
+})();
 </script>
 <script src="./comune/mqtt.min.js"></script>
 <script src="./comune/tavolata.js"></script>
