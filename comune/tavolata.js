@@ -86,6 +86,9 @@
   /* DONAZIONI (Ko-fi): con KOFI = null il pulsante c'è ma è grigio, "presto disponibile".
      Per attivarlo basta mettere il link della pagina, es. 'https://ko-fi.com/tavolata'. */
   const KOFI = 'https://ko-fi.com/tavolatateam';
+  /* STATISTICHE VISITE (Cloudflare Web Analytics, gratis e senza cookie): con null sono spente.
+     Per attivarle: il "token" che Cloudflare dà in Web Analytics → Add a site (solo le lettere e numeri). */
+  const STATISTICHE = null;
   const NUOVO_SITO = 'https://salagiochionline.tavolata.workers.dev/';                                // es. 'https://tavolata.pages.dev/'
   const VECCHI_SITI = ['salagiochionline.github.io'];
   const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
@@ -1337,8 +1340,17 @@
       const d = document.createElement('div'); d.className = 'tv-dona-riga'; d.innerHTML = donaHTML(); f.appendChild(d);
     });
   }
+  /* conta le visite solo sul sito vero (non nelle prove in locale né sul vecchio indirizzo) */
+  function contaVisite() {
+    if (!STATISTICHE || !NUOVO_SITO || location.host !== new URL(NUOVO_SITO).host || document.querySelector('script[data-cf-beacon]')) return;
+    const sc = document.createElement('script'); sc.defer = true;
+    sc.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    sc.setAttribute('data-cf-beacon', JSON.stringify({ token: STATISTICHE }));
+    document.head.appendChild(sc);
+  }
   function avvio() {
     stile();
+    try { contaVisite(); } catch (e) { }
     if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mettiDona); else mettiDona();
     if (DA_TRASLOCARE) { connetti(); preparaCifra(); if (document.body) mostraTrasloco(); else addEventListener('DOMContentLoaded', mostraTrasloco); return; }
     if (TRASLOCO && TRASLOCO.fatto) setTimeout(() => avviso('🏡 Benvenuto nel nuovo indirizzo di Tavolata: il tuo account è arrivato!'), 1200);
