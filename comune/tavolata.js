@@ -70,7 +70,7 @@
   const PAGINA = (() => {
     try { const base = new URL(BASE).pathname; const p = location.pathname; const r = p.startsWith(base) ? p.slice(base.length) : p.replace(/^\//, ''); return (r.split('/')[0] || 'home').replace(/\.html?$/, '').replace(/^index$/, 'home') || 'home'; } catch (e) { return 'home'; }
   })();
-  const TR = { on: LINGUA !== 'it', testi: new Map(), schemi: [], letti: 0, cache: new Map(), pronto: false };
+  const TR = { on: LINGUA !== 'it', testi: new Map(), schemi: [], letti: 0, cache: new Map(), pronto: false, fre: null };
   const trNorm = s => s.replace(/\s+/g, ' ').trim();
   function trCarica() {
     const a = window.TV_LINGUA || [];
@@ -80,7 +80,17 @@
       for (const k in (d.testi || {})) TR.testi.set(trNorm(k), d.testi[k]);
       (d.schemi || []).forEach(s => TR.schemi.push(s));
     }
-    TR.cache.clear();
+    TR.cache.clear(); TR.fre = null;
+  }
+  /* pezzi di frase: per le frasi composte (es. "Moira pesca 2 carte"), sostituisce i pezzi conosciuti.
+     Vale per le chiavi di almeno 4 lettere; le più lunghe hanno la precedenza. */
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function trPezzi(t) {
+    if (!TR.fre) {
+      const k = [...TR.testi.keys()].filter(x => x.length >= 3 && /\p{L}{3}/u.test(x) && TR.testi.get(x) !== x).sort((a, b) => b.length - a.length);
+      TR.fre = k.length ? new RegExp('(?<![\\p{L}\\p{N}])(' + k.map(reEsc).join('|') + ')(?![\\p{L}\\p{N}])', 'gu') : /$^/;
+    }
+    return t.replace(TR.fre, x => TR.testi.get(x));
   }
   function trNucleo(t) {
     let r = TR.testi.get(t);
@@ -108,6 +118,13 @@
         if (c != null) r = m[1] + c + m[3];
       }
     }
+    if (r == null && t.length > 1 && t === t.toUpperCase() && /\p{Lu}/u.test(t)) {
+      /* testo tutto in maiuscolo (es. "GIOCO DI CARTE"): cerco la versione normale */
+      const low = t.toLowerCase(), cap = low.charAt(0).toUpperCase() + low.slice(1);
+      const u = (cap !== t ? trFrase(cap) : null) || (low !== t ? trFrase(low) : null);
+      if (u != null) r = u.toUpperCase();
+    }
+    if (r == null) { const p = trPezzi(t); if (p !== t) r = p; }
     if (TR.cache.size > 4000) TR.cache.clear();
     TR.cache.set(t, r);
     return r;
@@ -122,8 +139,9 @@
   }
   const TR_SALTA = /^(SCRIPT|STYLE|TEXTAREA|NOSCRIPT|CODE|PRE)$/;
   const TR_ATTR = ['placeholder', 'title', 'aria-label', 'alt'];
-  function trSalta(el) { return TR_SALTA.test(el.tagName) || el.getAttribute('translate') === 'no' || (el.classList && el.classList.contains('tv-notr')) || el.isContentEditable; }
-  function trFuori(n) { const p = n.nodeType === 1 ? n : n.parentElement; return !p || !!p.closest('[translate="no"],.tv-notr,script,style,textarea,noscript,code,pre,[contenteditable="true"]'); }
+  /* .msg.chat = messaggi scritti dai giocatori nella chat dei giochi: restano come sono */
+  function trSalta(el) { return TR_SALTA.test(el.tagName) || el.getAttribute('translate') === 'no' || (el.classList && (el.classList.contains('tv-notr') || (el.classList.contains('chat') && el.classList.contains('msg')))) || el.isContentEditable; }
+  function trFuori(n) { const p = n.nodeType === 1 ? n : n.parentElement; return !p || !!p.closest('[translate="no"],.tv-notr,.msg.chat,script,style,textarea,noscript,code,pre,[contenteditable="true"]'); }
   function trTesto(n) {
     const v = n.nodeValue; if (!v || v.length > 2000 || !/\p{L}/u.test(v)) return;
     const r = traduci(v); if (r !== v) n.nodeValue = r;
@@ -1221,7 +1239,7 @@
     else if (a === 'copia') copia(b.dataset.txt, b.dataset.ok || 'Copiato');
     else if (a === 'dona-presto') avviso('☕ Le donazioni arriveranno presto. Grazie del pensiero!');
     else if (a === 'g-accedi') ggAccedi();
-    else if (a === 'g-esci') conferma('Uscire da Google?', 'Su questo dispositivo continui a giocare con lo stesso account, ma le modifiche non verranno più salvate su Google finché non accedi di nuovo.', 'Esci', ggEsci);
+    else if (a === 'g-esci') conferma('Uscire da Google?', 'Su questo dispositivo continui a giocare con lo stesso account, ma le modifiche non verranno più salvate su Google finché non accedi di nuovo.', 'Esci da Google', ggEsci);
     else if (a === 'g-elimina') conferma('Cancellare i dati da Google?', 'Cancello la copia del tuo account salvata con Google (nome, amici, statistiche) ed esco. Su questo dispositivo l\'account resta com\'è.', 'Cancella', ggElimina);
     else if (a === 'g-salva') { ggInvia().then(() => { GG.ultimo = Date.now(); avviso('☁️ Salvato'); ggCambio(); }).catch(e => { GG.msg = ggErrore(e); ggCambio(); }); }
     else if (a === 'agg-codice') {
