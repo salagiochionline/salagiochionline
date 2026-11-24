@@ -155,6 +155,14 @@
     'Scarta ✓': 'Discard ✓', 'Scarta': 'Discard',
     'da aprire': 'not opened',
     'sta calando': 'is laying down', 'pesca': 'draws', 'gioca': 'plays', 'rientrato': 're-entered',
+    "tocca una carta della mano e va da sola sul tavolo, in un gioco nuovo (le carte toccate una dopo l'altra finiscono insieme); toccala di nuovo per riprenderla. Per attaccarla a un gioco già sul tavolo trascinala con il mouse o con il dito. Per finire il turno premi “Scarta” e tocca la carta da scartare, oppure trascinala sugli": 'tap a card in your hand and it goes onto the table by itself, in a new meld (cards tapped one after another end up together); tap it again to take it back. To add it to a meld already on the table, drag it with the mouse or your finger. To end your turn press “Discard” and tap the card to discard, or drag it onto the',
+    'Tocca la carta da scartare': 'Tap the card to discard', 'Tocca la carta da scartare.': 'Tap the card to discard.', '✕ Annulla': '✕ Cancel',
+    'Apertura valida! Ora scarta: premi “Scarta” e tocca la carta, oppure trascinala sugli scarti.': 'Valid opening! Now discard: press “Discard” and tap the card, or drag it onto the discards.',
+    'Perfetto. Ora scarta: premi “Scarta” e tocca la carta, oppure trascinala sugli scarti.': 'Perfect. Now discard: press “Discard” and tap the card, or drag it onto the discards.',
+    'Tocca le carte per calarle sul tavolo (o trascinale su un gioco per attaccarle), poi premi “Scarta” e tocca la carta da scartare.': 'Tap cards to lay them on the table (or drag them onto a meld to add them), then press “Discard” and tap the card to discard.',
+    'Per aprire tocca le carte di scale e tris (vanno da sole sul tavolo) fino ad almeno 40 punti. Se non puoi, scarta una carta.': "To open, tap the cards of runs and sets (they go onto the table by themselves) up to at least 40 points. If you can't, discard a card.",
+    'Tocca la carta da scartare (o trascinala qui)': 'Tap the card to discard (or drag it here)',
+    'Tocca una carta per metterla sul tavolo, oppure trascinala qui': 'Tap a card to put it on the table, or drag it here',
     'Metti qui le carte selezionate': 'Put the selected cards here',
     'Nuovo gioco': 'New meld', 'con le carte selezionate': 'with the selected cards', 'Nuovo': 'New',
     'Il tavolo è vuoto: per calare la prima volta servono almeno 40 punti.': 'The table is empty: to lay down for the first time you need at least 40 points.',
@@ -241,6 +249,7 @@
     'cuori': 'hearts', 'quadri': 'diamonds', 'fiori': 'clubs', 'picche': 'spades', 'e': 'and'
   },
   schemi: [
+    [/^Gioco in rosso: (.+)\.$/, (m, e, tr) => { const t = tr(e.charAt(0).toUpperCase() + e.slice(1)); return t ? 'Meld in red: ' + t.charAt(0).toLowerCase() + t.slice(1) + '.' : null; }],
     [/^A eliminazione \((\d+)\) · mano (\d+)$/, 'Elimination ($1) · hand $2'],
     [/^Apertura (\d+)\/(\d+)$/, 'Opening $1/$2'],
     [/^Mano (\d+)\. Chi arriva a (\d+) punti esce\.$/, 'Hand $1. Whoever reaches $2 points is out.']

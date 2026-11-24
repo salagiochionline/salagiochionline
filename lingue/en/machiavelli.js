@@ -95,6 +95,14 @@
     "Rimetti tutto com'era all'inizio del turno": 'Put everything back as it was at the start of the turn',
     "Rimetti com'era": 'Put it back',
     'sta muovendo': 'is moving cards',
+    "(almeno 3 carte dello stesso seme in fila). L'asso va prima del 2 o dopo il K, ma non in mezzo (niente K‑A‑2), a meno che la partita abbia l'opzione “Scala che gira”.": '(at least 3 cards of the same suit in sequence). The ace goes before the 2 or after the K, but not in between (no K‑A‑2), unless the game has the “Wrap-around run” option.',
+    "tocca una carta della mano e va da sola sul tavolo, in una combinazione nuova (le carte toccate una dopo l'altra finiscono insieme); toccala di nuovo per riprenderla in mano. Per attaccare una carta a una combinazione o riorganizzare il tavolo trascinala con il mouse o con il dito. Le combinazioni valide si colorano di verde, quelle sbagliate di rosso.": 'tap a card in your hand and it goes onto the table by itself, in a new combination (cards tapped one after another end up together); tap it again to take it back into your hand. To add a card to a combination or rearrange the table, drag it with the mouse or your finger. Valid combinations turn green, wrong ones red.',
+    'Tocca una carta per metterla sul tavolo (toccala di nuovo per riprenderla), oppure trascinala dove vuoi per attaccarla o riorganizzare il tavolo.': 'Tap a card to put it on the table (tap it again to take it back), or drag it wherever you like to add it or rearrange the table.',
+    'Prima calata: cala una combinazione fatta solo con carte tue (tocca le carte una alla volta).': 'First play: lay down a combination made only from your cards (tap the cards one at a time).',
+    'Tocca una carta per metterla sul tavolo, oppure trascinala qui': 'Tap a card to put it on the table, or drag it here',
+    'Scala che gira (K‑A‑2)': 'Wrap-around run (K‑A‑2)', 'Scala che gira (K‑A‑2):': 'Wrap-around run (K‑A‑2):', 'la scala può girare: K‑A‑2 vale.': 'runs can wrap around: K‑A‑2 counts.',
+    "Di regola l'asso va solo prima del 2 o dopo il K. Con questa opzione la scala può": 'Normally the ace only goes before the 2 or after the K. With this option a run can',
+    'girare': 'wrap around', ': valgono anche Q‑K‑A‑2, K‑A‑2‑3 e così via.': ': Q‑K‑A‑2, K‑A‑2‑3 and so on are valid too.',
     'Metti qui le carte selezionate': 'Put the selected cards here',
     'Nuova combinazione': 'New combination', 'con le carte selezionate': 'with the selected cards', 'Nuova': 'New',
     'nel mazzo': 'in the deck',
@@ -146,6 +154,7 @@
     'Seleziona (o trascina qui) le carte per la nuova combinazione': 'Select (or drag here) the cards for the new combination', 'cuori': 'hearts', 'quadri': 'diamonds', 'fiori': 'clubs', 'picche': 'spades', 'e': 'and', 'Mazzo': 'Deck'
   },
   schemi: [
+    [/^Combinazione in rosso: (.+)\.$/, (m, e, tr) => { const t = tr(e.charAt(0).toUpperCase() + e.slice(1)); return t ? 'Combination in red: ' + t.charAt(0).toLowerCase() + t.slice(1) + '.' : null; }],
     [/^Il tavolo è vuoto: la prima combinazione la cala (.+)\.$/, 'The table is empty: $1 lays down the first combination.'],
     [/^Perfetto: hai calato (\d+) (cart[ae])\. Premi “Fine turno”\.$/, (m, n, c) => `Perfect: you played ${n} ${n === '1' ? 'card' : 'cards'}. Press “End turn”.`],
     [/^🚀 (.+) cala (\d+) carte!$/, '🚀 $1 plays $2 cards!'],

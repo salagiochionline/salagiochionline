@@ -228,6 +228,8 @@ input:focus,select:focus{outline:2px solid var(--violet);outline-offset:1px}
 .pc.sel{box-shadow:0 0 0 3px var(--blue),0 8px 18px rgba(0,0,0,.45);transform:translateY(-8px)}
 .hand .pc.sel{transform:translateY(-14px)}
 .pc.fresh::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px var(--accent)}
+.hand .pc.drawn{transform:translateY(-14px);box-shadow:0 0 0 3px #ffd43b,0 0 16px 4px rgba(255,212,59,.7);animation:pescata 1s ease-in-out 4}
+@keyframes pescata{50%{box-shadow:0 0 0 4px #ffd43b,0 0 26px 10px rgba(255,212,59,.95)}}
 .pc.fromhand::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px #4dabf7}
 .pc.dragging{opacity:.28}
 .editing .pc{cursor:grab;touch-action:none}
@@ -365,6 +367,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
     jolly: false,           // 4 jolly nel mazzo
     handSize: 13,           // carte iniziali
     firstMeld: false,       // prima calata tutta tua
+    giro: false,            // scala che gira: Q-K-A-2-3
     restorePenalty: true,   // tocchi il tavolo e rinunci: peschi 3
     turnTimer: 120,         // secondi per turno (0 = nessun limite)
     disconnectWait: 60      // secondi di attesa per chi si disconnette
@@ -399,6 +402,8 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
      cards: [{id, r, s}] carte vere, oppure {id, j:true, fix:{r,s}|null}
      fix = jolly già sul tavolo che vale una carta precisa (s null = tris)
      Ritorna {ok, kind, order:[id], as:{id:{r,s}}, err} */
+  let GIRO = false;          // opzione della partita: la scala può girare K-A-2
+  function setGiro(v) { GIRO = !!v; }
   function analyze(cards) {
     const n = cards.length;
     if (n === 0) return { ok: false, err: 'Vuota' };
@@ -478,6 +483,26 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
       if (J) as[J.id] = { r: jp === 14 ? 1 : jp, s };
       return { ok: true, kind: 'scala', order, as };
     }
+    return GIRO ? tryWrap(reals, J, s) : null;
+  }
+  /* scala che gira (…Q-K-A-2-3…): solo con l'opzione "giro" */
+  function tryWrap(reals, J, s) {
+    const pos = new Map();
+    for (const c of reals) { if (pos.has(c.r)) return null; pos.set(c.r, c.id); }
+    const n = reals.length + (J ? 1 : 0);
+    if (n < 3 || n > 13) return null;
+    for (let st = 1; st <= 13; st++) {
+      if (st + n - 1 < 15) continue;          // deve passare davvero dal K all'asso e poi al 2
+      const arc = []; for (let k = 0; k < n; k++) arc.push((st - 1 + k) % 13 + 1);
+      if (!reals.every(c => arc.includes(c.r))) continue;
+      const miss = arc.filter(r => !pos.has(r));
+      let jr = null;
+      if (!J) { if (miss.length) continue; }
+      else { if (miss.length !== 1) continue; jr = miss[0]; if (J.fix && J.fix.r !== jr) continue; }
+      const order = arc.map(r => r === jr ? J.id : pos.get(r));
+      const as = {}; if (J) as[J.id] = { r: jr, s };
+      return { ok: true, kind: 'scala', order, as };
+    }
     return null;
   }
 
@@ -551,6 +576,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
   /* ---------- controllo di una nuova disposizione del tavolo ----------
      groups: [[id, ...], ...] ritorna dettagli per l'interfaccia */
   function checkArrangement(s, idx, groups) {
+    GIRO = !!(s.options && s.options.giro);
     const p = s.players[idx];
     const tmap = new Map(); s.table.forEach(g => g.cards.forEach(c => tmap.set(c.id, c)));
     const hmap = new Map(); p.hand.forEach(c => hmap.set(c.id, c));
@@ -754,6 +780,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
   /* ---------- azioni ---------- */
   function err(e) { return { ok: false, error: e }; }
   function applyAction(s, a) {
+    GIRO = !!(s.options && s.options.giro);
     const r = applyInner(s, a);
     if (r.ok) s.version++;
     return r;
@@ -805,6 +832,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
 
   /* ---------- azione automatica (tempo scaduto) ---------- */
   function autoAction(s) {
+    GIRO = !!(s.options && s.options.giro);
     const i = actorIdx(s);
     if (i < 0) return null;
     return { type: 'draw', player: s.players[i].id, touched: false, auto: true };
@@ -813,7 +841,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
   return {
     SUITS, SUIT_SYM, SUIT_NAME, RED, RANK, SORD, DEFAULT_OPTIONS,
     setRandom, shuffle, buildDeck, cardName, valName, cardPoints, handPoints,
-    analyze, checkArrangement, createGame, applyAction, removePlayer, autoAction,
+    analyze, setGiro, checkArrangement, createGame, applyAction, removePlayer, autoAction,
     actorIdx, activeIdx, nextIdx, idxOf, tableCards, totalRounds
   };
 });
@@ -1024,6 +1052,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
 
   /* ---------- piano completo del bot ---------- */
   function botPlan(s, idx, budgetTotal) {
+    E.setGiro(s.options && s.options.giro);
     budgetTotal = budgetTotal || 60000;
     const p = s.players[idx];
     const byId = new Map();
@@ -1099,6 +1128,7 @@ function chatAperta() { if (innerWidth <= CHAT_BP) return false; try { return lo
   }
 
   function botAction(s, idx) {
+    E.setGiro(s.options && s.options.giro);
     const id = s.players[idx].id;
     let plan = null;
     try { plan = botPlan(s, idx); } catch (e) { plan = null; }
@@ -1234,6 +1264,7 @@ const GROUPS = [
   ] },
   { title: 'Regole', note: 'Il regolamento lascia libertà su alcuni punti: decidete voi.', items: [
     { key: 'firstMeld', label: 'Prima calata tutta tua', help: 'Finché non hai calato almeno una combinazione fatta <b>solo con carte della tua mano</b>, non puoi toccare le carte sul tavolo né attaccarci le tue. Nel turno in cui la cali puoi calare anche altre combinazioni tue; dal turno dopo puoi attaccare e riorganizzare liberamente.' },
+    { key: 'giro', label: 'Scala che gira (K‑A‑2)', help: 'Di regola l\'asso va solo prima del 2 o dopo il K. Con questa opzione la scala può <b>girare</b>: valgono anche Q‑K‑A‑2, K‑A‑2‑3 e così via.' },
     { key: 'restorePenalty', label: 'Penalità se tocchi il tavolo e rinunci', help: 'Come nel regolamento: se sposti carte che erano già sul tavolo e poi non riesci a sistemare tutto, il tavolo torna com\'era e <b>peschi 3 carte</b> invece di 1. Spostare e riprendere solo carte della tua mano non conta. Spenta, peschi sempre 1 carta.' }
   ] },
   { title: 'Tempo', items: [
@@ -1305,6 +1336,7 @@ let lastEventN = 0, resultsReadyAt = 0, resultsTimer = null;
 let botTimer = null, botFor = '';
 let feedKey = '', chatSeenT = 0, sideOpen = chatAperta();
 let WS = null;            // il mio "banco di lavoro" durante il turno
+let handPrev = null, handPrevKey = '', drawnIds = new Set();   // carte appena pescate (evidenziate in mano)
 let drag = null, suppressClick = 0, pendingRender = false, draftTimer = null, lastDraftSent = '';
 
 /* =========================================================
@@ -1377,9 +1409,9 @@ function howToHTML() {
     ${exampleGroups()}
     <ul class="rules-list">
     <li><b>Obiettivo:</b> calare sul tavolo tutte le carte che hai in mano.</li>
-    <li>Si gioca con due mazzi di carte francesi. Le combinazioni valide sono il <b>tris o poker</b> (3 o 4 carte dello stesso valore, semi tutti diversi) e la <b>scala</b> (almeno 3 carte dello stesso seme in fila). L'asso va prima del 2 o dopo il K, ma non in mezzo (niente K‑A‑2).</li>
+    <li>Si gioca con due mazzi di carte francesi. Le combinazioni valide sono il <b>tris o poker</b> (3 o 4 carte dello stesso valore, semi tutti diversi) e la <b>scala</b> (almeno 3 carte dello stesso seme in fila). L'asso va prima del 2 o dopo il K, ma non in mezzo (niente K‑A‑2), a meno che la partita abbia l'opzione “Scala che gira”.</li>
     <li><b>Il bello:</b> le carte sul tavolo non sono di nessuno. Al tuo turno puoi smontare e ricomporre tutte le combinazioni come vuoi, purché alla fine siano tutte valide e tu abbia calato almeno una carta tua.</li>
-    <li><b>Come si muovono le carte:</b> trascinale con il mouse o con il dito, oppure toccale per selezionarle e poi tocca dove metterle (il <b>＋</b> su una combinazione, “Nuova combinazione” o “Riporta in mano”). Le combinazioni valide si colorano di verde, quelle sbagliate di rosso.</li>
+    <li><b>Come si muovono le carte:</b> tocca una carta della mano e va da sola sul tavolo, in una combinazione nuova (le carte toccate una dopo l'altra finiscono insieme); toccala di nuovo per riprenderla in mano. Per attaccare una carta a una combinazione o riorganizzare il tavolo trascinala con il mouse o con il dito. Le combinazioni valide si colorano di verde, quelle sbagliate di rosso.</li>
     <li>Quando hai finito premi <b>Fine turno</b>. Se non vuoi o non puoi calare niente, premi <b>Pesca e passa</b>: peschi una carta.</li>
     <li>Le carte del tavolo non tornano mai in mano. Se hai spostato carte del tavolo e poi rinunci, di solito peschi <b>3 carte</b> di penalità.</li>
     <li>Quando il mazzo finisce si continua senza pescare: se nessuno riesce più a calare per un giro intero, vince la mano chi ha meno carte.</li>
@@ -1741,7 +1773,7 @@ function scheduleBots() {
 /* =========================================================
    BANCO DI LAVORO (il mio turno)
    ========================================================= */
-const G_ = () => S && S.game;
+const G_ = () => { const G = S && S.game; if (G) E.setGiro(G.options && G.options.giro); return G; };
 const myIdx = () => S && S.game ? S.game.players.findIndex(p => p.id === myId) : -1;
 const turnKey = G => G.round + ':' + G.turnNo;
 function isMyTurn() { const G = G_(); return !!(G && S.status === 'playing' && G.phase === 'turn' && G.players[G.turn] && G.players[G.turn].id === myId); }
@@ -1831,12 +1863,28 @@ function moveCards(ids, target) {
 function rerender() { if (drag && drag.started) { pendingRender = true; return; } renderGame(); }
 function undoMove() { if (!canEdit() || !WS.history.length) return; restoreWS(WS.history.pop()); sortGroups(); sendDraft(); renderGame(); }
 function resetMoves() { if (!canEdit()) return; if (WS.history.length) WS.history.push(snapWS()); restoreWS(WS.start); sortGroups(); sendDraft(); renderGame(); }
-function toggleSel(id) {
+/* tocco su una carta: dalla mano va da sola sul tavolo; una carta tua già sul tavolo torna in mano */
+function openGroup() {
+  for (let k = WS.groups.length - 1; k >= 0; k--) if (!WS.origGid.has(WS.groups[k].gid)) return WS.groups[k];
+  return null;
+}
+function tapTarget(id) {
+  const g = openGroup();
+  if (!g || g.ids.includes(id)) return { n: true };
+  const idx = cardIndex(G_());
+  const now = E.analyze(g.ids.map(x => idx.get(x)));
+  // la combinazione nuova si riempie finché non è valida; poi la carta va con lei solo se resta valida
+  if (!now.ok || E.analyze(g.ids.concat([id]).map(x => idx.get(x))).ok) return { g: g.gid };
+  return { n: true };
+}
+function tapCard(id) {
   if (!canEdit()) return;
+  const w = whereIs(id); if (!w) return;
+  if (w.h) return moveCards([id], tapTarget(id));
+  if (!WS.origTable.has(id)) return moveCards([id], { h: true });
   const G = G_(), me = G.players[myIdx()];
-  if (G.options.firstMeld && !me.opened && WS.origTable.has(id)) return toast('Prima calata: non puoi ancora toccare le carte del tavolo', 'warn');
-  WS.sel = WS.sel.includes(id) ? WS.sel.filter(x => x !== id) : WS.sel.concat([id]);
-  renderGame();
+  if (G.options.firstMeld && !me.opened) return toast('Prima calata: non puoi ancora toccare le carte del tavolo', 'warn');
+  moveCards([id], tapTarget(id));
 }
 function commitTurn() {
   if (!canEdit()) return;
@@ -2032,10 +2080,9 @@ function renderBoard(G) {
       const asv = c.j && a && a.ok ? (a.as[id] || null) : undefined;
       return cardHTML(c, ex, `data-id="${id}"`, asv);
     }).join('');
-    const showHere = editing && sel.length && !sel.every(id => g.ids.includes(id));
-    html += `<div class="${cls.join(' ')}" data-g="${esc(g.gid)}">${label && mode !== 'view' ? `<span class="gk" title="${esc(a.err)}">${esc(label)}</span>` : ''}${cards}${showHere ? `<button class="here" data-here="${esc(g.gid)}" title="Metti qui le carte selezionate">＋</button>` : ''}</div>`;
+    html += `<div class="${cls.join(' ')}" data-g="${esc(g.gid)}">${label && mode !== 'view' ? `<span class="gk" title="${esc(a.err)}">${esc(label)}</span>` : ''}${cards}</div>`;
   });
-  if (editing) html += `<button class="newzone" data-new="1">${sel.length ? '＋ Nuova combinazione<br><span class="small">con le carte selezionate</span>' : '＋ Nuova<br>combinazione'}</button>`;
+  if (editing) html += `<button class="newzone" data-new="1">＋ Nuova<br>combinazione</button>`;
   if (!groups.length && !editing) html = `<div class="empty-table">Il tavolo è vuoto: la prima combinazione la cala ${G.phase === 'turn' ? esc(G.players[G.turn].name) : '…'}.</div>`;
   el.innerHTML = html;
   $('#deckInfo').innerHTML = `<span class="stackmini"></span><span><b>${G.deck.length}</b> ${G.deck.length === 1 ? 'carta' : 'carte'} nel mazzo</span>`;
@@ -2066,7 +2113,6 @@ function statusText(G, me) {
     if (S.away && ap && S.away[ap.id]) return [`In attesa che ${ap.name} torni online…`, false];
     return [draftLive(G) ? `${ap.name} sta muovendo le carte…` : `Tocca a ${ap.name}…`, false];
   }
-  if (WS && WS.sel.length) return [`${WS.sel.length} ${WS.sel.length === 1 ? 'carta selezionata' : 'carte selezionate'}: tocca il ＋ dove metterle`, true];
   return ['Tocca a te!', true];
 }
 
@@ -2098,7 +2144,7 @@ function renderMe(G, me) {
     if (chk.ok) { h = `Perfetto: hai calato ${played} ${played === 1 ? 'carta' : 'carte'}. Premi “Fine turno”.`; hint.className = 'hint good'; }
     else {
       hint.className = 'hint';
-      h = played ? firstProblem(chk) : (G.options.firstMeld && !p.opened ? 'Prima calata: cala una combinazione fatta solo con carte tue (trascinala su “Nuova combinazione”).' : 'Trascina le carte (o toccale e poi tocca il ＋) per calare, attaccare o riorganizzare il tavolo.');
+      h = played ? firstProblem(chk) : (G.options.firstMeld && !p.opened ? 'Prima calata: cala una combinazione fatta solo con carte tue (tocca le carte una alla volta).' : 'Tocca una carta per metterla sul tavolo (toccala di nuovo per riprenderla), oppure trascinala dove vuoi per attaccarla o riorganizzare il tavolo.');
       if (!played && !WS.touched) hint.className = 'hint good';
     }
     if (pen) h += ` <span class="pen">· Hai spostato carte del tavolo: se rinunci peschi 3 carte.</span>`;
@@ -2108,10 +2154,14 @@ function renderMe(G, me) {
   const idx = cardIndex(G);
   const ids = editing ? WS.hand : p.hand.map(c => c.id);
   const cards = sortCards(ids.map(id => idx.get(id)).filter(Boolean));
-  const sel = editing ? WS.sel : [];
-  const back = editing && sel.length && sel.every(id => WS.origHand.has(id)) && sel.some(id => !WS.hand.includes(id));
-  $('#hand').innerHTML = cards.map(c => cardHTML(c, sel.includes(c.id) ? ['sel'] : [], `data-id="${c.id}"`)).join('')
-    + (back ? '<button class="btn sm" data-back="1" style="align-self:center;margin-left:10px">↩ Riporta in mano</button>' : '')
+  // carte appena pescate: quelle nuove rispetto alla mano di prima (nella stessa mano di gioco)
+  const stIds = p.hand.map(c => c.id), rk = code + ':' + (S.started || 0) + ':' + G.round;
+  if (handPrev && handPrevKey === rk) {
+    const nw = stIds.filter(id => !handPrev.has(id));
+    if (nw.length) drawnIds = new Set(nw); else if (stIds.length < handPrev.size) drawnIds = new Set();
+  } else drawnIds = new Set();
+  handPrev = new Set(stIds); handPrevKey = rk;
+  $('#hand').innerHTML = cards.map(c => cardHTML(c, drawnIds.has(c.id) ? ['drawn'] : [], `data-id="${c.id}"`)).join('')
     + (!cards.length && editing ? '<div class="mut small" style="align-self:center">Hai calato tutto! Premi “Fine turno” per chiudere 🎉</div>' : '');
   $('#sortBtn').textContent = sortMode === 'valore' ? '⇅ per seme' : '⇅ per valore';
 }
@@ -2295,13 +2345,14 @@ function rulesHTML() {
   on.push(`<li><b>Carte a testa:</b> ${o.handSize} · <b>Mazzo:</b> 2 mazzi francesi${o.jolly ? ' + 4 jolly' : ', senza jolly'}</li>`);
   if (o.jolly) on.push('<li><b>Jolly:</b> al massimo uno per combinazione; sul tavolo resta legato alla carta che sostituisce finché non cali la carta vera.</li>');
   on.push(`<li><b>Prima calata tutta tua:</b> ${o.firstMeld ? 'sì' : 'no'}</li>`);
+  on.push(`<li><b>Scala che gira (K‑A‑2):</b> ${o.giro ? 'sì' : 'no'}</li>`);
   on.push(`<li><b>Se tocchi il tavolo e rinunci:</b> ${o.restorePenalty ? 'peschi 3 carte' : 'peschi 1 carta come sempre'}</li>`);
   on.push(`<li><b>Tempo per turno:</b> ${o.turnTimer ? fmtTime(o.turnTimer * 1000) + ' minuti' : 'nessun limite'}</li>`);
   on.push(`<li><b>Attesa per chi si disconnette:</b> ${fmtTime(o.disconnectWait * 1000)}</li>`);
   const ex = [[EX(7, 'Q'), 'Numeri: il loro valore'], [EX(12, 'P'), 'J, Q, K: 10'], [EX(1, 'C'), 'Asso: 11'], [{ id: -1, j: true }, 'Jolly: 25']];
   return `<h2>Regole di questa partita</h2>${exampleGroups()}<ul class="rules-list">${on.join('')}
     <li><b>Il turno:</b> puoi calare, attaccare e riorganizzare tutto il tavolo; alla fine ogni combinazione deve essere valida e devi aver calato almeno una carta tua. Altrimenti peschi.</li>
-    <li><b>Asso:</b> prima del 2 o dopo il K, niente giro K‑A‑2.</li>
+    <li><b>Asso:</b> ${o.giro ? 'la scala può girare: K‑A‑2 vale' : 'prima del 2 o dopo il K, niente giro K‑A‑2'}.</li>
     <li><b>Mazzo finito:</b> si continua senza pescare; se nessuno cala per un giro intero vince la mano chi ha meno carte.</li></ul>
     ${o.jolly ? `<details class="opt"><summary>Come funzionano i jolly</summary><div class="help">${JOLLY_HELP}</div></details>` : ''}
     <h3>Valore delle carte rimaste in mano</h3><p>Chi chiude prende 0 punti, gli altri sommano il valore delle carte che hanno ancora in mano.</p>
@@ -2371,7 +2422,7 @@ function onPointerUp(e) {
   endDrag();
   // il "click" che segue il tocco non deve finire sui pulsanti appena comparsi
   suppressClick = Date.now() + 600;
-  if (!d.started) { toggleSel(d.id); return; }
+  if (!d.started) { tapCard(d.id); return; }
   if (d.target) moveCards(d.ids, d.target);
   else if (pendingRender) { pendingRender = false; renderGame(); }
 }
@@ -2392,14 +2443,8 @@ function bindGame() {
   game.addEventListener('pointerdown', onPointerDown);
   game.addEventListener('click', e => {
     if (Date.now() < suppressClick) { suppressClick = 0; return; }
-    const here = e.target.closest('[data-here]');
-    if (here && WS && WS.sel.length) return moveCards(WS.sel.slice(), { g: here.dataset.here });
     const nz = e.target.closest('[data-new]');
-    if (nz) { if (WS && WS.sel.length) return moveCards(WS.sel.slice(), { n: true }); return toast('Seleziona (o trascina qui) le carte per la nuova combinazione'); }
-    const back = e.target.closest('[data-back]');
-    if (back && WS && WS.sel.length) return moveCards(WS.sel.slice(), { h: true });
-    // tocco sul tavolo vuoto: deseleziona
-    if (WS && WS.sel.length && e.target.closest('#board') && !e.target.closest('.pc')) { WS.sel = []; renderGame(); }
+    if (nz) return toast('Tocca una carta per metterla sul tavolo, oppure trascinala qui');
   });
   $('#undoBtn').addEventListener('click', undoMove);
   $('#resetBtn').addEventListener('click', resetMoves);
@@ -2429,7 +2474,6 @@ function bindGlobal() {
   document.addEventListener('keydown', e => {
     if (!canEdit() || /input|textarea|select/i.test((e.target.tagName || ''))) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoMove(); }
-    else if (e.key === 'Escape' && WS.sel.length) { WS.sel = []; renderGame(); }
   });
   let rt = null;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (view === 'game' && S && S.game && S.status !== 'lobby') renderGame(); }, 120); });

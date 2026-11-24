@@ -250,7 +250,11 @@ input:focus,select:focus{outline:2px solid var(--violet);outline-offset:1px}
 .pc.fromhand::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px #4dabf7}
 .pc.must::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px var(--accent)}
 .pc.must::before{content:'DA USARE';position:absolute;left:0;right:0;top:42%;text-align:center;font-size:calc(var(--w)*.15);font-weight:700;letter-spacing:.04em;background:var(--accent);color:#2a1d00;z-index:2}
-.pc.drawn{box-shadow:0 0 0 3px #3ddc84,0 6px 16px rgba(0,0,0,.45)}
+.pc.drawn{box-shadow:0 0 0 3px #ffd43b,0 0 16px 4px rgba(255,212,59,.7);animation:pescata 1s ease-in-out 4}
+.hand .pc.drawn{transform:translateY(-14px)}
+@keyframes pescata{50%{box-shadow:0 0 0 4px #ffd43b,0 0 26px 10px rgba(255,212,59,.95)}}
+.hand.scegli .pc:not(.nodisc){box-shadow:0 0 0 3px #ff6b6b,0 6px 16px rgba(0,0,0,.45);cursor:pointer}
+.hand.scegli .pc:not(.nodisc):hover{transform:translateY(-14px)}
 .pc.nodisc::before{content:'⛔';position:absolute;right:2px;top:2px;font-size:calc(var(--w)*.2);line-height:1;z-index:2;opacity:.9}
 .pc.lastdisc::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px var(--accent)}
 .pc.dragging{opacity:.28}
@@ -1417,6 +1421,7 @@ let lastEventN = 0, resultsReadyAt = 0, resultsTimer = null;
 let botTimer = null, botFor = '';
 let feedKey = '', chatSeenT = 0, sideOpen = chatAperta();
 let WS = null;            // il mio "banco di lavoro" durante il turno
+let scartoMode = false;   // dopo “Scarta”: il prossimo tocco su una carta della mano la scarta
 let drag = null, suppressClick = 0, pendingRender = false, draftTimer = null, lastDraftSent = '';
 
 /* =========================================================
@@ -1494,7 +1499,7 @@ function howToHTML() {
     <li><b>Il turno:</b> peschi una carta (dal mazzo, oppure l'ultima degli scarti se hai già aperto), cali o attacchi se vuoi, e finisci <b>scartando</b> una carta.</li>
     <li><b>Apertura:</b> la prima volta che cali, i giochi nuovi fatti con le tue carte devono valere <b>almeno 40 punti</b> (numeri = valore, figure 10, asso 11 o 1 nella scala A‑2‑3, il jolly vale la carta che sostituisce). Il gioco ti mostra il conto mentre componi.</li>
     <li>Dopo aver aperto puoi calare altri giochi, <b>attaccare</b> carte ai giochi di tutti (in fondo alle scale o la quarta carta di un tris) e <b>recuperare i jolly</b> mettendo al loro posto la carta vera. I giochi sul tavolo non si dividono e non si riorganizzano.</li>
-    <li><b>Carte da trascinare:</b> trascinale con il mouse o con il dito, oppure toccale e poi tocca il <b>＋</b> dove metterle. Per finire il turno trascina una carta sugli <b>scarti</b>, oppure toccala e premi “Scarta”.</li>
+    <li><b>Carte da trascinare:</b> tocca una carta della mano e va da sola sul tavolo, in un gioco nuovo (le carte toccate una dopo l'altra finiscono insieme); toccala di nuovo per riprenderla. Per attaccarla a un gioco già sul tavolo trascinala con il mouse o con il dito. Per finire il turno premi “Scarta” e tocca la carta da scartare, oppure trascinala sugli <b>scarti</b>.</li>
     <li><b>Scarti:</b> la carta presa dagli scarti va usata subito. Non puoi scartare una carta che si attacca a un gioco sul tavolo (⛔), tranne quando chiudi (o in due, dopo aver aperto).</li>
     <li>Non si chiude al primo turno. Se il mazzo finisce, gli scarti vengono rimescolati (fino a due volte).</li>
     <li><b>Modalità:</b> a eliminazione (esce chi arriva a 101 punti, vince l'ultimo rimasto), partita singola (vince chi chiude) o torneo (più mani, vince chi ha meno punti).</li>
@@ -1971,18 +1976,29 @@ function moveCards(ids, target) {
 function rerender() { if (drag && drag.started) { pendingRender = true; return; } renderGame(); }
 function undoMove() { if (!canEdit() || !WS.history.length) return; restoreWS(WS.history.pop()); sortGroups(); sendDraft(); renderGame(); }
 function resetMoves() { if (!canEdit()) return; if (WS.history.length) WS.history.push(snapWS()); restoreWS(WS.start); sortGroups(); sendDraft(); renderGame(); }
-function toggleSel(id) {
-  if (!canEdit()) {
-    // durante la pesca: toccare il mazzo o gli scarti
-    return;
-  }
-  if (WS.origTable.has(id) && !isTableJolly(id)) return toast('Le carte sul tavolo restano dove sono: puoi solo attaccarci le tue');
-  WS.sel = WS.sel.includes(id) ? WS.sel.filter(x => x !== id) : WS.sel.concat([id]);
-  renderGame();
+/* tocco su una carta: dalla mano va da sola sul tavolo (in un gioco nuovo); una carta tua già sul tavolo torna in mano */
+function openGroup() {
+  for (let k = WS.groups.length - 1; k >= 0; k--) if (!WS.origGid.has(WS.groups[k].gid)) return WS.groups[k];
+  return null;
 }
-function selectedDiscard() {
-  if (!WS || WS.sel.length !== 1 || !WS.hand.includes(WS.sel[0])) return null;
-  return WS.sel[0];
+function tapTarget(id) {
+  const g = openGroup();
+  if (!g || g.ids.includes(id)) return { n: true };
+  const idx = cardIndex(G_());
+  const view = x => { const c = idx.get(x); return c.j ? { id: x, j: true, fix: WS.origTable.has(x) ? c.as : null } : { id: x, r: c.r, s: c.s }; };
+  // il gioco nuovo si riempie finché non è valido; poi la carta va con lui solo se resta valido
+  if (!E.analyze(g.ids.map(view)).ok || E.analyze(g.ids.concat([id]).map(view)).ok) return { g: g.gid };
+  return { n: true };
+}
+function tapCard(id) {
+  if (!canEdit()) return;
+  const w = whereIs(id); if (!w) return;
+  if (scartoMode && w.h) { scartoMode = false; return discardTurn(id); }
+  if (scartoMode) { scartoMode = false; renderGame(); }
+  if (w.h) return moveCards([id], tapTarget(id));
+  if (!WS.origTable.has(id)) return moveCards([id], { h: true });
+  if (!isTableJolly(id)) return toast('Le carte sul tavolo restano dove sono: puoi solo attaccarci le tue');
+  moveCards([id], tapTarget(id));
 }
 function discardTurn(id) {
   if (!canEdit()) return;
@@ -2184,10 +2200,9 @@ function renderBoard(G) {
       const asv = !c.j ? undefined : a && a.ok ? (a.as[id] || null) : (chk && chk.freed && chk.freed.includes(id) ? null : undefined);
       return cardHTML(c, ex, `data-id="${id}"`, asv);
     }).join('');
-    const showHere = editing && sel.length && !sel.every(id => g.ids.includes(id));
-    html += `<div class="${cls.join(' ')}" data-g="${esc(g.gid)}">${label && mode !== 'view' ? `<span class="gk" title="${esc(a.err)}">${esc(label)}</span>` : ''}${cards}${showHere ? `<button class="here" data-here="${esc(g.gid)}" title="Metti qui le carte selezionate">＋</button>` : ''}</div>`;
+    html += `<div class="${cls.join(' ')}" data-g="${esc(g.gid)}">${label && mode !== 'view' ? `<span class="gk" title="${esc(a.err)}">${esc(label)}</span>` : ''}${cards}</div>`;
   });
-  if (editing) html += `<button class="newzone" data-new="1">${sel.length ? '＋ Nuovo gioco<br><span class="small">con le carte selezionate</span>' : '＋ Nuovo<br>gioco'}</button>`;
+  if (editing) html += `<button class="newzone" data-new="1">＋ Nuovo<br>gioco</button>`;
   if (!groups.length && !editing) html = `<div class="empty-table">Il tavolo è vuoto: per calare la prima volta servono almeno 40 punti.</div>`;
   el.innerHTML = html;
 }
@@ -2239,10 +2254,7 @@ function statusText(G, me) {
     return [draftLive(G) ? `${ap.name} sta calando le carte…` : `Tocca a ${ap.name}…`, false];
   }
   if (G.step === 'draw') return ['Tocca a te: pesca!', true];
-  if (WS && WS.sel.length) {
-    if (selectedDiscard() != null) return ['Tocca il ＋ dove metterla, oppure premi “Scarta”', true];
-    return [`${WS.sel.length} ${WS.sel.length === 1 ? 'carta selezionata' : 'carte selezionate'}: tocca il ＋ dove metterle`, true];
-  }
+  if (scartoMode) return ['Tocca la carta da scartare', true];
   return ['Tocca a te: cala e poi scarta', true];
 }
 
@@ -2278,20 +2290,22 @@ function renderMe(G, me) {
     const played = [...WS.origHand].filter(id => !WS.hand.includes(id)).length;
     $('#undoBtn').disabled = !WS.history.length;
     $('#resetBtn').disabled = !WS.history.length && !played;
-    const sd = selectedDiscard();
     const db = $('#discardBtn');
     const closingNow = chk.arrOk && chk.closing;
-    db.textContent = closingNow ? 'Scarta e chiudi 🎉' : 'Scarta ✓';
-    db.disabled = !(chk.arrOk && sd != null && !chk.forbid.includes(sd));
+    if (!chk.arrOk) scartoMode = false;
+    db.textContent = scartoMode ? '✕ Annulla' : closingNow ? 'Scarta e chiudi 🎉' : 'Scarta ✓';
+    db.className = scartoMode ? 'btn' : 'btn go';
+    db.disabled = !chk.arrOk;
     if (chk.arrOk) forbid = new Set(chk.forbid);
     let h = '';
     const openTag = !p.opened ? `<span class="opencount ${chk.opening ? 'done' : ''}">Apertura ${G.options.noJollyOpen ? chk.openPtsNoJ : chk.openPts}/${E.OPEN_MIN}</span>` : '';
     if (chk.arrOk) {
       hint.className = 'hint good';
-      if (closingNow) h = 'Ti resta una carta sola: scartala per chiudere! 🎉';
-      else if (chk.opening) h = `Apertura valida! Ora scegli la carta da scartare: trascinala sugli scarti, oppure toccala e premi “Scarta”.`;
-      else if (played) h = `Perfetto. Ora scegli la carta da scartare: trascinala sugli scarti, oppure toccala e premi “Scarta”.`;
-      else h = p.opened ? 'Cala o attacca le tue carte, poi scarta: trascina una carta sugli scarti (o toccala e premi “Scarta”).' : 'Per aprire trascina su “Nuovo gioco” scale e tris per almeno 40 punti. Se non puoi, scarta una carta.';
+      if (scartoMode) h = 'Tocca la carta da scartare.';
+      else if (closingNow) h = 'Ti resta una carta sola: scartala per chiudere! 🎉';
+      else if (chk.opening) h = `Apertura valida! Ora scarta: premi “Scarta” e tocca la carta, oppure trascinala sugli scarti.`;
+      else if (played) h = `Perfetto. Ora scarta: premi “Scarta” e tocca la carta, oppure trascinala sugli scarti.`;
+      else h = p.opened ? 'Tocca le carte per calarle sul tavolo (o trascinale su un gioco per attaccarle), poi premi “Scarta” e tocca la carta da scartare.' : 'Per aprire tocca le carte di scale e tris (vanno da sole sul tavolo) fino ad almeno 40 punti. Se non puoi, scarta una carta.';
       if (forbid.size) h += ' <span class="pen">⛔ = carta che si attacca al tavolo: non si può scartare.</span>';
     } else {
       hint.className = 'hint';
@@ -2304,18 +2318,16 @@ function renderMe(G, me) {
   const idx = cardIndex(G);
   const ids = editing ? WS.hand : p.hand.map(c => c.id);
   const cards = sortCards(ids.map(id => { const c = idx.get(id); return c && c.j && c.as ? Object.assign({}, c, { as: null }) : c; }).filter(Boolean));
-  const sel = editing ? WS.sel : [];
-  const back = editing && sel.length && sel.every(id => WS.origHand.has(id) || (G.options.jollyInHand && isTableJolly(id))) && sel.some(id => !WS.hand.includes(id));
+  if (!editing) scartoMode = false;
+  $('#hand').classList.toggle('scegli', editing && scartoMode);
   const myTurnPlay = G.phase === 'turn' && G.turn === me && G.step === 'play';
   $('#hand').innerHTML = cards.map(c => {
     const ex = [];
-    if (sel.includes(c.id)) ex.push('sel');
     if (myTurnPlay && G.picked === c.id) ex.push('must');
     else if (myTurnPlay && G.drawn === c.id) ex.push('drawn');
     if (forbid.has(c.id)) ex.push('nodisc');
     return cardHTML(c, ex, `data-id="${c.id}"`);
-  }).join('')
-    + (back ? '<button class="btn sm" data-back="1" style="align-self:center;margin-left:10px">↩ Riporta in mano</button>' : '');
+  }).join('');
   $('#sortBtn').textContent = sortMode === 'valore' ? '⇅ per seme' : '⇅ per valore';
 }
 
@@ -2591,7 +2603,7 @@ function onPointerUp(e) {
   endDrag();
   // il "click" che segue il tocco non deve finire sui pulsanti appena comparsi
   suppressClick = Date.now() + 350;
-  if (!d.started) { toggleSel(d.id); return; }
+  if (!d.started) { tapCard(d.id); return; }
   if (d.target) moveCards(d.ids, d.target);
   else if (pendingRender) { pendingRender = false; renderGame(); }
 }
@@ -2615,25 +2627,23 @@ function bindGame() {
     if (e.target.closest('#deckStock')) { if (canDraw()) drawFrom('deck'); return; }
     if (e.target.closest('#pileStock')) {
       if (canDraw()) return drawFrom('pile');
-      const sd = selectedDiscard(); if (canEdit() && sd != null) return discardTurn(sd);
-      if (canEdit()) toast('Per scartare trascina qui una carta della tua mano, oppure toccala e premi “Scarta”');
+      if (canEdit()) { const c = checkWS(); if (!c.arrOk) return toast(firstProblem(c), 'warn'); scartoMode = true; renderGame(); toast('Tocca la carta da scartare (o trascinala qui)'); }
       return;
     }
-    const here = e.target.closest('[data-here]');
-    if (here && WS && WS.sel.length) return moveCards(WS.sel.slice(), { g: here.dataset.here });
     const nz = e.target.closest('[data-new]');
-    if (nz) { if (WS && WS.sel.length) return moveCards(WS.sel.slice(), { n: true }); return toast('Seleziona (o trascina qui) le carte per il nuovo gioco'); }
-    const back = e.target.closest('[data-back]');
-    if (back && WS && WS.sel.length) return moveCards(WS.sel.slice(), { h: true });
-    // tocco sul tavolo vuoto: deseleziona
-    if (WS && WS.sel.length && e.target.closest('#board') && !e.target.closest('.pc')) { WS.sel = []; renderGame(); }
+    if (nz) return toast('Tocca una carta per metterla sul tavolo, oppure trascinala qui');
   });
   $('#undoBtn').addEventListener('click', undoMove);
   $('#resetBtn').addEventListener('click', resetMoves);
   $('#unpickBtn').addEventListener('click', unpickTurn);
   $('#deckBtn').addEventListener('click', () => drawFrom('deck'));
   $('#pileBtn').addEventListener('click', () => drawFrom('pile'));
-  $('#discardBtn').addEventListener('click', () => { const sd = selectedDiscard(); if (sd == null) return toast('Tocca prima la carta da scartare'); discardTurn(sd); });
+  $('#discardBtn').addEventListener('click', () => {
+    if (!canEdit()) return;
+    if (scartoMode) { scartoMode = false; return renderGame(); }
+    const c = checkWS(); if (!c.arrOk) return toast(firstProblem(c), 'warn');
+    scartoMode = true; renderGame();
+  });
   $('#sortBtn').addEventListener('click', () => { sortMode = sortMode === 'valore' ? 'seme' : 'valore'; ls.set('s40-sort', sortMode); renderGame(); });
   $('#rulesBtn').addEventListener('click', () => showInfo(rulesHTML()));
   $('#scoreBtn').addEventListener('click', () => showInfo(scoresHTML()));
@@ -2658,7 +2668,7 @@ function bindGlobal() {
   document.addEventListener('keydown', e => {
     if (!canEdit() || /input|textarea|select/i.test((e.target.tagName || ''))) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoMove(); }
-    else if (e.key === 'Escape' && WS.sel.length) { WS.sel = []; renderGame(); }
+    else if (e.key === 'Escape' && scartoMode) { scartoMode = false; renderGame(); }
   });
   let rt = null;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (view === 'game' && S && S.game && S.status !== 'lobby') renderGame(); }, 120); });
