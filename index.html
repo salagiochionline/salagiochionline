@@ -66,19 +66,19 @@
   .brand-mark i:nth-child(2),.brand-mark i:nth-child(4),.brand-mark i:nth-child(6),.brand-mark i:nth-child(8){visibility:hidden}
   .brand-name{font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.6rem;letter-spacing:.2px}
 
-  .hero{padding:44px 0 34px;display:grid;gap:18px}
+  .hero{padding:44px 0 34px;display:grid;gap:18px;justify-items:center;text-align:center}
   .hero h1{
     font-family:"Fredoka",sans-serif;font-weight:700;
-    font-size:clamp(2.3rem,6vw,4.1rem);line-height:1.02;letter-spacing:-.5px;max-width:15ch;
+    font-size:clamp(2.3rem,6vw,4.1rem);line-height:1.02;letter-spacing:-.5px;max-width:20ch;text-wrap:balance;
   }
   .hero h1 .hl{color:var(--yellow);position:relative;white-space:nowrap}
   .hero h1 .hl::after{
     content:"";position:absolute;left:-2%;right:-2%;bottom:.04em;height:.16em;border-radius:99px;
     background:rgba(255,207,74,.28);z-index:-1;
   }
-  .hero p{color:var(--muted);font-size:1.12rem;max-width:52ch}
+  .hero p{color:var(--muted);font-size:1.12rem;max-width:56ch;text-wrap:pretty}
 
-  .steps{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  .steps{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:6px}
   .step{
     display:flex;align-items:center;gap:9px;
     background:rgba(255,255,255,.05);border:1px solid var(--line);
