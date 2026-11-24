@@ -1287,7 +1287,7 @@ function buildGameUI(){
         <div class="poscard" id="poscard"></div>
         <div class="status" id="status"></div><div class="actions" id="actions"></div>
         <div class="aucbox" id="aucbox" style="display:none"></div>
-        <div class="lastev" id="lastev"></div>
+        <div class="lastev" id="lastev" translate="no"></div>
         <div class="cardpop" id="cardpop"><h3></h3><p></p></div>
       </div>
       <div class="tokens" id="tokens"></div>
@@ -1371,7 +1371,7 @@ function rollDice(){drawDice(true);}
 let cardT=null;
 function showCard(c){if(!c)return;const el=$('#cardpop');if(!el)return;el.querySelector('h3').textContent=(c.d==='chance'?'Sorpresa':'Tesoro');el.querySelector('p').textContent=c.x;
   setTimeout(()=>{el.classList.add('show');clearTimeout(cardT);cardT=setTimeout(()=>el.classList.remove('show'),3400);},animQ.length||animating?900:200);}
-const money=t=>esc(noEmo(t)).replace(/(-?\d[\d.]*) €/g,'<b class="eur">$1 €</b>');
+const money=t=>esc(noEmo(window.Tavolata&&Tavolata.t?Tavolata.t(t):t)).replace(/(-?\d[\d.]*) €/g,'<b class="eur">$1 €</b>');
 
 function renderPosCard(){
   const el=$('#poscard');if(!el)return;
@@ -1577,11 +1577,11 @@ function renderFeed(){
   const log=(S.log||[]).slice(-90);
   const key=log.length+':'+(log.length?log[log.length-1].t:0)+':'+(S.v||0);
   if(key!==lastFeedKey){lastFeedKey=key;const near=f.scrollHeight-f.scrollTop-f.clientHeight<80;
-    f.innerHTML=log.map(l=>`<div class="lg">${money(l.m)}</div>`).join('');if(near||!f._init){f.scrollTop=f.scrollHeight;f._init=1;}}
+    f.innerHTML=log.map(l=>`<div class="lg" translate="no">${money(l.m)}</div>`).join('');if(near||!f._init){f.scrollTop=f.scrollHeight;f._init=1;}}
   const c=$('#chatlist');if(!c)return;
   const ck=chat.length+':'+(chat.length?chat[chat.length-1].t:0)+':'+chatPending.size;
   if(ck!==lastChatKey){lastChatKey=ck;
-    c.innerHTML=chat.length?chat.map(m=>`<div class="ch${chatPending.has(m._id)?' pend':''}"><b style="color:${/^#[0-9a-f]{3,8}$/i.test(m.c)?m.c:'#ccc'}">${esc(m.by)}:</b> ${esc(m.x)}${chatPending.has(m._id)?' <span class="pendtag">invio…</span>':''}</div>`).join(''):'<div class="small mut">Nessun messaggio. Scrivi qualcosa ai tuoi amici!</div>';
+    c.innerHTML=chat.length?chat.map(m=>`<div translate="no" class="ch${chatPending.has(m._id)?' pend':''}"><b style="color:${/^#[0-9a-f]{3,8}$/i.test(m.c)?m.c:'#ccc'}">${esc(m.by)}:</b> ${esc(m.x)}${chatPending.has(m._id)?` <span class="pendtag">${window.Tavolata&&Tavolata.t?Tavolata.t('invio…'):'invio…'}</span>`:''}</div>`).join(''):'<div class="small mut">Nessun messaggio. Scrivi qualcosa ai tuoi amici!</div>';
     c.scrollTop=c.scrollHeight;if(TAB==='chat'||(!isMob()&&!chatChiusa))chatSeen=lastChatT();updBadge();}
 }
 
