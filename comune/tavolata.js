@@ -88,7 +88,7 @@
   const KOFI = 'https://ko-fi.com/tavolatateam';
   /* STATISTICHE VISITE (Cloudflare Web Analytics, gratis e senza cookie): con null sono spente.
      Per attivarle: il "token" che Cloudflare dà in Web Analytics → Add a site (solo le lettere e numeri). */
-  const STATISTICHE = null;
+  const STATISTICHE = 'a043090f27224bd3bed72cda2a8db292';
   const NUOVO_SITO = 'https://salagiochionline.tavolata.workers.dev/';                                // es. 'https://tavolata.pages.dev/'
   const VECCHI_SITI = ['salagiochionline.github.io'];
   const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
