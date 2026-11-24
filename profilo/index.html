@@ -98,6 +98,13 @@ function quale() {
 
 function pct(v, n) { return n ? Math.round(v / n * 100) : 0; }
 function giocoCard(g, r, link) {
+  if (g.inc) return `<div class="gc" style="--accent:${g.colore}">
+    <h3><span>${g.ico}</span>${esc(g.nome)}</h3>
+    <div class="nums"><div><b>${r.p}</b><span>sessioni</span></div><div><b>${r.a}</b><span>con gli amici</span></div></div>
+    ${(r.x || []).map(([l, v]) => `<div class="x"><span class="mut">${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}
+    <div class="x"><span class="mut">🕒 Ultima sessione</span><b>${r.u ? esc(T.quando(r.u)) : '–'}</b></div>
+    ${link ? `<a href="../${g.id}/${T.QS}">Tutte le statistiche e gioca →</a>` : ''}
+  </div>`;
   const perc = pct(r.v, r.a);
   return `<div class="gc" style="--accent:${g.colore}">
     <h3><span>${g.ico}</span>${esc(g.nome)}</h3>
@@ -112,7 +119,7 @@ function statsHTML(giochi, mio) {
   const usati = T.GIOCHI.filter(g => giochi[g.id]);
   const tot = usati.reduce((a, g) => a + giochi[g.id].p, 0);
   const vin = usati.reduce((a, g) => a + giochi[g.id].v, 0);
-  const con = usati.reduce((a, g) => a + giochi[g.id].a, 0);
+  const con = usati.filter(g => !g.inc).reduce((a, g) => a + giochi[g.id].a, 0);
   const pref = usati.slice().sort((a, b) => giochi[b.id].p - giochi[a.id].p)[0];
   if (!usati.length) return `<div class="mut">${mio ? 'Ancora nessuna partita conclusa. Finisci una partita in un gioco qualsiasi e qui trovi le statistiche di tutti i giochi insieme.' : 'Ancora nessuna partita conclusa (o le statistiche non sono ancora arrivate).'}</div>`;
   const ord = usati.sort((a, b) => (giochi[b.id].u || 0) - (giochi[a.id].u || 0));
@@ -127,6 +134,7 @@ function statsHTML(giochi, mio) {
     ${mio && usati.length < T.GIOCHI.length ? `<div class="lbl" style="margin-top:18px">Ancora da provare</div><div class="nogames">${T.GIOCHI.filter(g => !giochi[g.id]).map(g => `<a href="../${g.id}/${T.QS}">${g.ico} ${esc(g.nome)}</a>`).join('')}</div>` : ''}`;
 }
 function esito(r) {
+  if (r.esito) return [r.esito, ''];
   if (r.removed) return ['Disconnesso', ''];
   if (r.won || r.champ || (r.place === 1 && r.n > 1)) return ['Vittoria!', 'win'];
   if (r.n === 1) return ['Da solo', ''];

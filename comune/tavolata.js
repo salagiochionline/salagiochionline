@@ -120,7 +120,9 @@
     { id: 'lamente', nome: 'La Mente', colore: '#da77f2', ico: '🧠', stats: 'lm-stats', nomeK: 'lm-name' },
     { id: 'nomicosecitta', nome: 'Nomi, Cose, Città', colore: '#ffe066', ico: '✏️', stats: 'ncc-stats', nomeK: 'ncc-name' },
     { id: 'texasholdem', nome: "Texas Hold'em", colore: '#51cf66', ico: '♣️', stats: 'th-stats', nomeK: 'th-name', max: 300 },
-    { id: 'blackjack', nome: 'Blackjack', colore: '#fab005', ico: '🂱', stats: 'bj-stats', nomeK: 'bj-name' }
+    { id: 'blackjack', nome: 'Blackjack', colore: '#fab005', ico: '🂱', stats: 'bj-stats', nomeK: 'bj-name' },
+    /* Prato: gioco incrementale. Ogni "partita" è una sessione di gioco; inc = niente vittorie */
+    { id: 'prato', nome: 'Prato', colore: '#7fdc5a', ico: '🌱', stats: 'pr-stats', nomeK: 'pr-name', inc: true }
   ];
   const GIOCO = id => GIOCHI.find(g => g.id === id) || null;
 
@@ -629,7 +631,8 @@
     impostore: rs => ({ extra: [['⭐ Punti fatti', sumOf(rs, r => r.pts)]] }),
     lamente: rs => ({ extra: [['🧠 Livello più alto', fin(maxOf(rs, r => r.best))]] }),
     nomicosecitta: rs => ({ extra: [['🏆 Record di punti', fin(maxOf(rs, r => r.total))]] }),
-    texasholdem: rs => ({ vinte: rs.filter(r => r.place === 1 && r.n > 1).length, extra: [['🪙 Record di fiches', fin(maxOf(rs, r => r.chips)), v => v === '–' ? v : it(v)]] })
+    texasholdem: rs => ({ vinte: rs.filter(r => r.place === 1 && r.n > 1).length, extra: [['🪙 Record di fiches', fin(maxOf(rs, r => r.chips)), v => v === '–' ? v : it(v)]] }),
+    prato: rs => ({ vinte: 0, conAltri: rs.filter(r => r.coop).length, extra: [['💰 Monete guadagnate', fin(maxOf(rs, r => r.tot)), v => v === '–' ? v : it(v)], ['⭐ Livello', fin(maxOf(rs, r => r.lv))], ['🌱 Ciuffi tagliati', sumOf(rs, r => r.cells)]] })
   };
   function partiteDi(g, nomi) {
     let rs = jget(g.stats); if (!Array.isArray(rs)) return [];

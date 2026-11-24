@@ -15,7 +15,7 @@
     'giochi provati': 'games tried',
     'Disconnesso': 'Disconnected',
     'Vittoria!': 'Win!',
-    'Da solo': 'Solo',
+    'Da solo': 'Solo', 'Insieme': 'Together', 'sessioni': 'sessions', 'con gli amici': 'with friends', '🕒 Ultima sessione': '🕒 Last session', 'Ultima sessione': 'Last session',
     'Pareggio': 'Draw',
     'Persa': 'Lost',
     'Ultime partite': 'Recent games',
