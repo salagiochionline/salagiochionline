@@ -1065,7 +1065,7 @@ function makeLocalKV() {
    RETE SENZA ACCOUNT: server pubblico MQTT (messaggi "conservati")
    Ogni documento è un messaggio conservato sul tema tavolata-paroleincodice/v1/<percorso>
    ========================================================= */
-const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://broker.emqx.io:8084/mqtt'; })();
+const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://test.mosquitto.org:8081/mqtt'; })();
 const TP = 'tavolata-paroleincodice/v1/';
 let netDropAt = 0;
 const Net = {

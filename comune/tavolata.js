@@ -19,7 +19,7 @@
   const SCRIPT = document.currentScript;
   const BASE = (() => { try { return new URL('..', SCRIPT.src).href; } catch (e) { return location.origin + '/'; } })();
   const QS = (() => { try { const q = new URLSearchParams(location.search); return q.get('broker') ? '?broker=' + encodeURIComponent(q.get('broker')) : ''; } catch (e) { return ''; } })();
-  const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://broker.emqx.io:8084/mqtt'; })();
+  const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://test.mosquitto.org:8081/mqtt'; })();
   const TP = 'tavolata/v1/';
   const ONLINE_MS = 75000;          // un amico è online se ha dato segni di vita da meno di così
   const STANZA_MS = 50000;          // una stanza pubblica sparisce se chi l'ha creata non si fa sentire

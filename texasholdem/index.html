@@ -1808,7 +1808,7 @@ function makeLocalKV() {
 /* =========================================================
    RETE SENZA ACCOUNT: server pubblico MQTT (messaggi "conservati")
    ========================================================= */
-const BROKER = PARAMS.get('broker') || 'wss://broker.emqx.io:8084/mqtt';
+const BROKER = PARAMS.get('broker') || 'wss://test.mosquitto.org:8081/mqtt';
 const TP = 'tavolata-texasholdem/v1/';
 let lastTrouble = Date.now();
 const Net = {
