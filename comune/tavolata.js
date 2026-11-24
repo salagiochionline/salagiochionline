@@ -85,7 +85,7 @@
      nome, amici e statistiche arrivano poi dal server cifrato (o da Google). */
   /* DONAZIONI (Ko-fi): con KOFI = null il pulsante c'è ma è grigio, "presto disponibile".
      Per attivarlo basta mettere il link della pagina, es. 'https://ko-fi.com/tavolata'. */
-  const KOFI = null;
+  const KOFI = 'https://ko-fi.com/tavolatateam';
   const NUOVO_SITO = 'https://salagiochionline.tavolata.workers.dev/';                                // es. 'https://tavolata.pages.dev/'
   const VECCHI_SITI = ['salagiochionline.github.io'];
   const DA_TRASLOCARE = !!NUOVO_SITO && VECCHI_SITI.includes(location.host);
