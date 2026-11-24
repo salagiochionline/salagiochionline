@@ -70,7 +70,7 @@
   const PAGINA = (() => {
     try { const base = new URL(BASE).pathname; const p = location.pathname; const r = p.startsWith(base) ? p.slice(base.length) : p.replace(/^\//, ''); return (r.split('/')[0] || 'home').replace(/\.html?$/, '').replace(/^index$/, 'home') || 'home'; } catch (e) { return 'home'; }
   })();
-  const TR = { on: LINGUA !== 'it', testi: new Map(), schemi: [], letti: 0, cache: new Map(), pronto: false, fre: null };
+  const TR = { on: LINGUA !== 'it', testi: new Map(), schemi: [], parole: new Map(), inverso: new Map(), letti: 0, cache: new Map(), pronto: false, fre: null };
   const trNorm = s => s.replace(/\s+/g, ' ').trim();
   function trCarica() {
     const a = window.TV_LINGUA || [];
@@ -78,6 +78,8 @@
     while (TR.letti < a.length) {
       const d = a[TR.letti++]; if (!d || d.lingua !== LINGUA) continue;
       for (const k in (d.testi || {})) TR.testi.set(trNorm(k), d.testi[k]);
+      /* parole: solo parole intere (es. le parole segrete dei giochi), mai dentro le frasi */
+      for (const k in (d.parole || {})) { const v = d.parole[k]; TR.parole.set(k.toLowerCase(), v); if (!TR.inverso.has(v.toLowerCase())) TR.inverso.set(v.toLowerCase(), k); }
       (d.schemi || []).forEach(s => TR.schemi.push(s));
     }
     TR.cache.clear(); TR.fre = null;
@@ -95,9 +97,11 @@
   function trNucleo(t) {
     let r = TR.testi.get(t);
     if (r != null) return r;
+    r = TR.parole.get(t.toLowerCase());
+    if (r != null) return (t.length > 1 && t === t.toUpperCase() && t !== t.toLowerCase()) ? r.toUpperCase() : t.charAt(0) !== t.charAt(0).toLowerCase() ? r.charAt(0).toUpperCase() + r.slice(1) : r;
     for (const [re, rep] of TR.schemi) {
       const m = t.match(re);
-      if (m && m[0] === t) return typeof rep === 'function' ? rep.apply(null, m.concat([trFrase])) : t.replace(re, rep);
+      if (m && m[0] === t) { const r2 = typeof rep === 'function' ? rep.apply(null, m.concat([trFrase])) : t.replace(re, rep); if (r2 != null) return r2; }
     }
     return null;
   }
@@ -115,6 +119,8 @@
         let c = trNucleo(m[2]);
         if (c == null && m[3]) { const c2 = trNucleo(m[2] + m[3]); if (c2 != null) { c = c2; m[3] = ''; } }
         if (c == null && m[1]) { const c3 = trNucleo((m[2] + m[3]).trim()); if (c3 != null) { c = c3; m[3] = ''; } }
+        /* domanda mostrata senza "?" (es. "✕ Ha gli occhi verdi") */
+        if (c == null && !m[3]) { const c4 = trNucleo(m[2] + '?'); if (c4 != null) c = c4.replace(/\?$/, ''); }
         if (c != null) r = m[1] + c + m[3];
       }
     }
@@ -149,6 +155,7 @@
   function trAttr(el) {
     for (const a of TR_ATTR) { const v = el.getAttribute(a); if (v) { const r = traduci(v); if (r !== v) el.setAttribute(a, r); } }
     if (el.tagName === 'INPUT' && /^(button|submit|reset)$/i.test(el.type) && el.value) { const r = traduci(el.value); if (r !== el.value) el.value = r; }
+    if (el.tagName === 'OPTION' && el.parentElement && el.parentElement.tagName === 'DATALIST' && el.value) { const r = traduci(el.value); if (r !== el.value) el.value = r; }
   }
   function trAlbero(root) {
     if (!TR.on || !root) return;
@@ -1557,6 +1564,8 @@
     collegato: () => Net.ok, esc, quando, render,
     kofi: KOFI, donaHTML: donaBreveHTML,
     lingua: LINGUA, lingue: Object.assign({}, LINGUE), t: traduci, linguaHTML, traduciPagina: () => trAlbero(document),
+    /* parola tradotta → parola italiana (per i giochi di parole: i confronti si fanno sempre in italiano) */
+    originale: s => { if (!TR.on || s == null) return s; trCarica(); const k = String(s).trim().toLowerCase(); return TR.inverso.get(k) || s; },
     google: {
       stato: ggStato, accedi: ggAccedi, esci: ggEsci, elimina: ggElimina, salva: ggInvia, prepara: ggCarica, html: ggHTML,
       /* per altre pagine (es. la bacheca): Firestore già pronto e l'utente Google attuale */

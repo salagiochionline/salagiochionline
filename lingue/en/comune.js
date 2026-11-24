@@ -450,7 +450,7 @@
     'Nelle statistiche risulta quante volte si è disconnesso.': 'The stats show how many times they disconnected.',
     'La partita finisce quando qualcuno supera 99 punti.': 'The game ends when someone goes over 99 points.',
     'Animali': 'Animals',
-    'Gioco di squadra': 'Team game', 'Gioco di parole': 'Word game', 'Gioco di bluff': 'Bluffing game', 'Gioco di deduzione': 'Deduction game', 'Gioco di strategia': 'Strategy game', 'Squadra': 'Team',
+    'Gioco di squadra': 'Team game', 'Gioco di gruppo': 'Group game', 'Gioco a squadre': 'Team game', 'Gioco per due': 'Two-player game', 'Gioco di parole': 'Word game', 'Gioco di bluff': 'Bluffing game', 'Gioco di deduzione': 'Deduction game', 'Gioco di strategia': 'Strategy game', 'Squadra': 'Team',
     'Gioco di carte': 'Card game', 'Gioco di dadi': 'Dice game', 'Gioco da tabellone': 'Board game', 'Gioco da casinò': 'Casino game', 'Party game': 'Party game',
     'punti': 'points', 'punto': 'point', 'poi': 'then', 'giocatori': 'players', 'giocatore': 'player'
   },

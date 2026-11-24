@@ -2162,10 +2162,12 @@ function renderBar(G) {
   on('#voteOk', () => castVote(G, voteSel));
   const gi = $('#guessIn', bar);
   if (gi) { gi.focus(); gi.onkeydown = e => { if (e.key === 'Enter') $('#guessOk').click(); }; }
-  on('#guessOk', () => { const t = $('#guessIn').value.trim(); if (!t) return toast('Scrivi una parola', 'warn'); send({ type: 'guess', text: t }); });
+  /* in un'altra lingua la parola si confronta sempre in italiano (vedi Tavolata.originale) */
+  const ita = t => (window.Tavolata && Tavolata.originale) ? Tavolata.originale(t) : t;
+  on('#guessOk', () => { const t = $('#guessIn').value.trim(); if (!t) return toast('Scrivi una parola', 'warn'); send({ type: 'guess', text: ita(t) }); });
   on('#bAny', () => showInfo(`<h2>🎯 Indovina la parola</h2><p>Se indovini vinci subito la manche (3 punti). Se sbagli, perdi e ti sei scoperto da solo!</p><div class="cluein"><input id="anyIn" list="allwords" maxlength="40" placeholder="La parola segreta è…" autocomplete="off"></div><div class="mbtns"><button class="btn" data-close-info>Annulla</button><button class="btn primary" id="anyOk">Prova!</button></div>`, m => {
     $('#anyIn', m).focus(); $('#anyIn', m).onkeydown = e => { if (e.key === 'Enter') $('#anyOk', m).click(); };
-    $('#anyOk', m).onclick = () => { const t = $('#anyIn', m).value.trim(); if (!t) return; hideInfo(); send({ type: 'guess', text: t }); };
+    $('#anyOk', m).onclick = () => { const t = $('#anyIn', m).value.trim(); if (!t) return; hideInfo(); send({ type: 'guess', text: (window.Tavolata && Tavolata.originale) ? Tavolata.originale(t) : t }); };
   }));
   on('#resB', () => { viewTable = ''; renderModal(G, true); });
 }
