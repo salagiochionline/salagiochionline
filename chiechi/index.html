@@ -1050,7 +1050,7 @@ function makeLocalKV() {
 /* =========================================================
    RETE SENZA ACCOUNT: server pubblico MQTT (messaggi "conservati")
    ========================================================= */
-const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://test.mosquitto.org:8081/mqtt'; })();
+const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return ((window.Tavolata&&Tavolata.broker)||'wss://test.mosquitto.org:8081/mqtt'); })();
 const TP = 'tavolata-chiechi/v1/';
 let lastTrouble = Date.now();
 const Net = {

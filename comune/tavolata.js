@@ -19,7 +19,87 @@
   const SCRIPT = document.currentScript;
   const BASE = (() => { try { return new URL('..', SCRIPT.src).href; } catch (e) { return location.origin + '/'; } })();
   const QS = (() => { try { const q = new URLSearchParams(location.search); return q.get('broker') ? '?broker=' + encodeURIComponent(q.get('broker')) : ''; } catch (e) { return ''; } })();
-  const BROKER = (() => { try { const q = new URLSearchParams(location.search); if (q.get('broker')) return q.get('broker'); } catch (e) { } return 'wss://test.mosquitto.org:8081/mqtt'; })();
+  /* Server multiplayer (dal 24/11/2026): il nostro, sullo stesso indirizzo del sito (/mqtt, vedi server/worker.js).
+     Fuori dal sito (GitHub Pages, file aperti dal computer) si usa ancora il server pubblico di prova.
+     Per le prove: ?broker=ws://… nell'indirizzo. */
+  const BROKER_PROVA = (() => { try { return new URLSearchParams(location.search).get('broker') || ''; } catch (e) { return ''; } })();
+  const BROKER_NOSTRO = (() => {
+    try { if (!/^https?:$/.test(location.protocol) || /(^|\.)github\.io$/.test(location.hostname)) return ''; return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mqtt'; } catch (e) { return ''; }
+  })();
+  const BROKER = BROKER_PROVA || BROKER_NOSTRO || 'wss://test.mosquitto.org:8081/mqtt';
+  const PING = 'tavolata/v1/ping';
+
+  /* ---------------------------------------------------------
+     CONNESSIONI SEMPRE VIVE (per tutti i giochi e per il modulo)
+     Ogni pagina usa mqtt.connect: qui lo "avvolgiamo" così che
+     - tutti vadano sullo stesso server (BROKER);
+     - una connessione morta venga scoperta in pochi secondi:
+       MQTT.js da solo non se ne accorge finché la pagina continua
+       a spedire messaggi (non manda più i "ping"), e sul telefono,
+       dopo aver cambiato app anche per un attimo, la pagina restava
+       collegata solo in apparenza → partita bloccata fino a ricaricare;
+     - al ritorno sulla pagina si controlla subito la linea e, se serve,
+       ci si ricollega: il server rimanda lo stato aggiornato.
+     --------------------------------------------------------- */
+  const CLIENTI = new Set();
+  function sorveglia(c) {
+    const S = c.tvS = { rx: Date.now(), attesa: 0, prova: null };
+    c.on('packetreceive', () => { S.rx = Date.now(); S.attesa = 0; });
+    c.on('packetsend', p => { if (!S.attesa && p && (p.cmd === 'pingreq' || p.cmd === 'subscribe' || (p.cmd === 'publish' && p.qos > 0))) S.attesa = Date.now(); });
+    c.on('connect', () => { S.rx = Date.now(); S.attesa = 0; });
+    c.on('end', () => CLIENTI.delete(c));
+    const rifai = () => {           // chiude la linea morta: MQTT.js si ricollega da solo
+      if (!c.connected) return;
+      S.attesa = 0;
+      try { if (typeof c._cleanUp === 'function') c._cleanUp(true); else c.stream && c.stream.destroy(); } catch (e) { }
+    };
+    c.tvRifai = rifai;
+    c.tvControlla = (subito) => {
+      if (c.disconnecting || c.disconnected) return;
+      if (!c.connected) { try { if (!c.reconnecting && typeof c._reconnect === 'function' && !c.reconnectTimer) c._reconnect(); } catch (e) { } return; }
+      if (subito) return rifai();
+      if (S.prova) return;
+      const t0 = Date.now(); let fatto = false;
+      S.prova = setTimeout(() => { S.prova = null; if (!fatto && S.rx < t0) rifai(); }, 2500);
+      try { c.publish(PING, '', { qos: 1 }, () => { fatto = true; }); } catch (e) { }
+    };
+    CLIENTI.add(c);
+    return c;
+  }
+  (function avvolgi() {
+    if (typeof window.mqtt === 'undefined' || !window.mqtt.connect || window.mqtt.tvAvvolto) return;
+    const orig = window.mqtt.connect;
+    window.mqtt.connect = function (url, opts) {
+      if (typeof url === 'object' && url && !opts) { opts = url; url = BROKER; }
+      if (!BROKER_PROVA) url = BROKER;
+      opts = Object.assign({}, opts);
+      if (!opts.keepalive || opts.keepalive > 20) opts.keepalive = 20;
+      if (!opts.connectTimeout || opts.connectTimeout > 10000) opts.connectTimeout = 10000;
+      if (!opts.reconnectPeriod || opts.reconnectPeriod > 2000) opts.reconnectPeriod = 2000;
+      return sorveglia(orig.call(this, url, opts));
+    };
+    window.mqtt.tvAvvolto = true;
+  })();
+  /* ogni 2 s: se abbiamo spedito qualcosa che aspetta risposta e da 6 s non arriva niente, la linea è morta;
+     se è tutto tranquillo da 15 s, una piccola prova (il server risponde subito) */
+  setInterval(() => {
+    const ora = Date.now();
+    CLIENTI.forEach(c => {
+      try {
+        const S = c.tvS; if (!S || !c.connected) return;
+        if (S.attesa && S.rx < S.attesa && ora - S.attesa > 6000) c.tvRifai();
+        else if (ora - S.rx > 15000) c.tvControlla(false);
+      } catch (e) { }
+    });
+  }, 2000);
+  let nascostaDa = 0;
+  function tornato() {
+    const fuori = nascostaDa ? Date.now() - nascostaDa : 0; nascostaDa = 0;
+    CLIENTI.forEach(c => { try { c.tvControlla(fuori > 60000); } catch (e) { } });
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) nascostaDa = Date.now(); else tornato(); });
+  addEventListener('online', () => CLIENTI.forEach(c => { try { c.tvControlla(true); } catch (e) { } }));
+  addEventListener('pageshow', e => { if (e.persisted) CLIENTI.forEach(c => { try { c.tvControlla(true); } catch (e2) { } }); });
   const TP = 'tavolata/v1/';
   const ONLINE_MS = 75000;          // un amico è online se ha dato segni di vita da meno di così
   const STANZA_MS = 50000;          // una stanza pubblica sparisce se chi l'ha creata non si fa sentire
@@ -362,8 +442,12 @@
     try { Net.c.publish(TP + t, obj == null ? '' : JSON.stringify(obj), { qos: 1, retain: retain !== false }); } catch (e) { }
   }
 
+  let primoCollegamento = true;
   function alCollegamento() {
-    pubProfilo(); pubPresenza(true); syncConto(); controllaStats(true); pubRiepilogo(true);
+    // alla prima connessione della pagina si ripubblica tutto; dopo una ricollegata basta quello che è cambiato
+    const primo = primoCollegamento; primoCollegamento = false;
+    pubProfilo(); pubPresenza(true);
+    if (primo) { syncConto(); controllaStats(true); pubRiepilogo(true); } else { controllaStats(false); pubRiepilogo(false); }
   }
   function pubProfilo() { if (!C.nome || !C.t) return; pub('utenti/' + C.id + '/profilo', { id: C.id, nome: C.nome, foto: C.foto, emoji: C.emoji, colore: C.colore, t: C.t }); }
 
@@ -786,7 +870,12 @@
   const FB_VER = '13.3.0';
   const FB_URL = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
   K.google = 'tavolata-google';
-  const GG = { m: null, auth: null, db: null, user: null, pronto: null, stato: FIREBASE ? 'fuori' : 'assente', msg: '', ultimo: 0, occupato: false, blocco: false, popup: false, hash: {}, presto: null };
+  const GG = { m: null, auth: null, db: null, user: null, pronto: null, stato: FIREBASE ? 'fuori' : 'assente', msg: '', ultimo: 0, occupato: false, blocco: false, popup: false, hash: {}, presto: null,
+    /* allineato: in questa pagina abbiamo già letto da Google l'account salvato (finché non succede, NON si scrive niente:
+       prima, se la lettura falliva o era lenta, il salvataggio automatico copriva l'account su Google con quello nuovo
+       del dispositivo, e chi accedeva da un altro dispositivo ripartiva da capo).
+       cloudId: id dell'account che c'è su Google (null = ancora niente). */
+    allineato: false, cloudId: undefined, tentativi: 0, riprova: null };
   const ggInfo = () => jget(K.google);
   function ggCambio() { emit('google', ggStato()); render(); }
   function ggStato() {
@@ -849,6 +938,7 @@
     avviso('🗑️ Dati cancellati da Google. Su questo dispositivo l\'account resta.');
   }
   async function ggUtente(u) {
+    GG.allineato = false; GG.cloudId = undefined; clearTimeout(GG.riprova); GG.tentativi = 0;
     if (!u) {
       GG.user = null;
       if (ggInfo()) jset(K.google, null);
@@ -894,10 +984,11 @@
   }
   /* manda solo quello che è cambiato dall'ultima volta */
   async function ggInvia() {
-    if (!GG.user || !GG.m || GG.blocco) return;
+    if (!GG.user || !GG.m || GG.blocco || !GG.allineato) return;
+    if (GG.cloudId && GG.cloudId !== C.id) return;      // mai coprire su Google un account diverso da quello letto
     const { fs } = GG.m; const uid = GG.user.uid; const lavori = [];
     const dati = JSON.stringify(ggDati()); const h0 = hashStr(dati);
-    if (GG.hash.main !== h0) lavori.push(fs.setDoc(fs.doc(GG.db, 'utenti', uid), { v: 1, id: C.id, t: Date.now(), dati }).then(() => { GG.hash.main = h0; }));
+    if (GG.hash.main !== h0) { const mio = C.id; lavori.push(fs.setDoc(fs.doc(GG.db, 'utenti', uid), { v: 1, id: mio, t: Date.now(), dati }).then(() => { GG.hash.main = h0; GG.cloudId = mio; })); }
     GIOCHI.forEach(g => {
       let rs = jget(g.stats); if (!Array.isArray(rs)) rs = [];
       const tomb = (SY[g.stats] && SY[g.stats].tomb) || [];
@@ -915,60 +1006,105 @@
   /* all'accesso (e a ogni apertura di pagina): unisce cloud e dispositivo */
   async function ggAllinea(primaVolta) {
     if (!GG.user || GG.occupato) return;
-    GG.occupato = true;
+    GG.occupato = true; clearTimeout(GG.riprova);
     const { fs } = GG.m; const uid = GG.user.uid;
     try {
       const snap = await fs.getDoc(fs.doc(GG.db, 'utenti', uid));
+      if (!GG.user || GG.user.uid !== uid) { GG.occupato = false; return; }
       if (!snap.exists()) {
-        GG.hash = {};
+        GG.hash = {}; GG.cloudId = null; GG.allineato = true;
         await ggInvia();
         if (primaVolta) avviso('☁️ Fatto! Il tuo account ora è salvato con Google: su un altro dispositivo ti basta accedere.');
       } else {
         let x = null; try { x = JSON.parse(snap.data().dati); } catch (e) { }
-        if (x && /^u-[A-Z0-9]{8}$/.test(x.id) && x.seg && x.id !== C.id) { GG.occupato = false; GG.blocco = true; ggCambio(); return ggAdotta(x); }
+        if (x && /^u-[A-Z0-9]{8}$/.test(x.id) && x.seg && x.id !== C.id) { GG.cloudId = x.id; GG.occupato = false; GG.blocco = true; ggCambio(); return ggAdotta(x); }
+        GG.cloudId = x && x.id ? x.id : null; GG.allineato = true;
         if (x) ggUnisci(x);
         await ggScaricaStats();
         await ggInvia();
         if (primaVolta) avviso('☁️ Bentornato! Account recuperato da Google.');
       }
+      GG.tentativi = 0;
       GG.ultimo = GG.ultimo || Date.now(); GG.msg = '';
       const i = ggInfo(); if (i && i.uid === uid) jset(K.google, Object.assign(i, { ultimo: GG.ultimo, hash: GG.hash }));
-    } catch (e) { console.warn('tavolata google', e); GG.msg = ggErrore(e); }
+    } catch (e) {
+      console.warn('tavolata google', e);
+      if (!GG.allineato) {
+        // lettura non riuscita (rete lenta, telefono appena tornato…): si riprova da soli, senza scrivere nulla
+        GG.msg = 'Non riesco ancora a leggere il tuo account da Google: riprovo da solo…';
+        const attesa = Math.min(60000, 4000 * Math.pow(2, GG.tentativi++));
+        GG.riprova = setTimeout(() => ggAllinea(primaVolta), attesa);
+      } else GG.msg = ggErrore(e);
+    }
     GG.occupato = false; ggCambio(); render();
   }
-  /* su Google c'è un account diverso da quello del dispositivo: si usa quello di Google */
+  /* su Google c'è un account diverso da quello del dispositivo: si uniscono in uno solo.
+     Si tiene l'account con più amici (così cambiano id meno persone); a parità quello di Google.
+     Amici, nomi e statistiche di tutti e due restano; gli amici dell'account lasciato vengono avvisati. */
   function ggAdotta(x) {
     const p = pulisciProfilo(x.profilo) || {};
-    const fai = async () => {
+    const am = x.amici || {};
+    const listaSu = (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id));
+    const usciteSu = (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id));
+    const fine = async (msg, ricarica) => {
+      SY = {}; salvaSY();
+      GG.occupato = true; GG.blocco = false; GG.allineato = true;
+      try { await ggScaricaStats(); GG.hash = {}; await ggInvia(); } catch (e) { console.warn('tavolata google', e); }
+      GG.occupato = false;
+      avviso(msg);
+      if (ricarica) setTimeout(() => location.reload(), 1800); else { ggCambio(); render(); }
+    };
+    /* si usa l'account di Google su questo dispositivo */
+    const usaGoogle = async () => {
       try { pub('presenza/' + C.id, { on: false, t: Date.now() }); } catch (e) { }
       const vecchiNomi = C.nomi, vecchioId = C.id, vecchiAmici = A.lista.slice(), vecchieUscite = A.uscite.slice();
       C = { id: x.id, seg: x.seg, nome: p.nome || C.nome, foto: p.foto || '', emoji: p.emoji || '', colore: p.colore || C.colore, t: p.t || 1, nomi: uniq([...(x.nomi || []).map(pulisciNome), ...vecchiNomi]), creato: +x.creato || Date.now() };
       salvaConto();
       GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
-      const am = x.amici || {};
-      const lista = (am.lista || []).filter(a => a && /^u-[A-Z0-9]{8}$/.test(a.id) && a.id !== vecchioId);
+      const lista = listaSu.filter(a => a.id !== vecchioId);
       vecchiAmici.forEach(a => { if (a && a.id !== C.id && !lista.some(b => b.id === a.id)) lista.push(a); });
-      const uscite = (am.uscite || []).filter(u => u && /^u-[A-Z0-9]{8}$/.test(u.id));
+      const uscite = usciteSu.slice();
       vecchieUscite.forEach(u => { if (u && u.id !== C.id && !uscite.some(b => b.id === u.id) && !lista.some(b => b.id === u.id)) uscite.push(u); });
       A = { t: Date.now(), lista, uscite };
       jset(K.amici, A);
       avvisaCambioId(vecchioId, vecchiAmici);
-      SY = {}; salvaSY();
-      GG.occupato = true; GG.blocco = false;
-      try { await ggScaricaStats(); GG.hash = {}; await ggInvia(); } catch (e) { }
-      GG.occupato = false;
-      avviso('☁️ Account recuperato da Google: ricarico la pagina…');
-      setTimeout(() => location.reload(), 1800);
+      GG.cloudId = C.id;
+      await fine('☁️ Account recuperato da Google: ricarico la pagina…', true);
     };
+    /* si tiene l'account di questo dispositivo e ci si aggiunge quello che c'era su Google */
+    const tieniQuesto = async () => {
+      const vecchioId = x.id;
+      if (p.t && p.t > C.t) { if (p.nome) C.nome = p.nome; C.foto = p.foto; C.emoji = p.emoji; C.colore = p.colore; C.t = p.t; }
+      C.nomi = uniq([...C.nomi, ...(x.nomi || []).map(pulisciNome)]);
+      salvaConto(); pubProfilo(); emit('profilo', profiloDi(C.id)); aggiornaDom(C.id);
+      GIOCHI.forEach(g => { if (C.nome) lss(g.nomeK, C.nome); });
+      const lista = A.lista.slice();
+      listaSu.forEach(a => { if (a.id !== C.id && !lista.some(b => b.id === a.id)) lista.push({ id: a.id, nome: pulisciNome(a.nome), da: +a.da || 0 }); });
+      const uscite = A.uscite.slice();
+      usciteSu.forEach(u => { if (u.id !== C.id && !uscite.some(b => b.id === u.id) && !lista.some(b => b.id === u.id)) uscite.push(u); });
+      A = { t: Date.now(), lista, uscite };
+      jset(K.amici, A); A.lista.forEach(a => { sub('presenza/' + a.id); chiediProfilo(a.id); }); emit('amici');
+      avvisaCambioId(vecchioId, listaSu);
+      try { pub('presenza/' + vecchioId, { on: false, t: Date.now() }); } catch (e) { }
+      GG.cloudId = C.id;           // da ora su Google c'è l'account unito
+      await fine('☁️ Account uniti e salvati con Google: amici e statistiche sono tutti qui.', false);
+    };
+    const tengoQui = A.lista.length > listaSu.length;
+    if (!A.lista.length && C.t <= 1) return usaGoogle();       // dispositivo nuovo: si prende quello di Google senza chiedere
     const qui = C.nome || 'senza nome', su = p.nome || 'senza nome';
-    if (!A.lista.length && C.t <= 1) return fai();
-    conferma('Usare l\'account salvato su Google?',
-      `Su Google c'è già il tuo account "${su}". Su questo dispositivo ce n'è un altro ("${qui}"${A.lista.length ? ', con ' + A.lista.length + (A.lista.length === 1 ? ' amico' : ' amici') : ''}). Userai quello di Google: le statistiche e gli amici di questo dispositivo vengono aggiunti, e i tuoi amici vengono avvisati del cambio.`,
-      'Usa l\'account Google', fai, async () => { try { await GG.m.au.signOut(GG.auth); } catch (e) { } jset(K.google, null); GG.user = null; GG.blocco = false; GG.stato = 'fuori'; ggCambio(); });
+    const n = k => k + (k === 1 ? ' amico' : ' amici');
+    conferma('Unire i due account?',
+      `Su Google è salvato l'account "${su}" (${n(listaSu.length)}), su questo dispositivo c'è "${qui}" (${n(A.lista.length)}). Se sono tutti e due tuoi li unisco in uno solo: amici e statistiche restano tutti, e i tuoi amici vengono avvisati da soli. Se questo dispositivo è di un'altra persona, premi Annulla.`,
+      'Unisci', tengoQui ? tieniQuesto : usaGoogle,
+      async () => { try { await GG.m.au.signOut(GG.auth); } catch (e) { } jset(K.google, null); GG.user = null; GG.blocco = false; GG.allineato = false; GG.stato = 'fuori'; ggCambio(); });
   }
   function ggPresto() { if (!GG.user) return; clearTimeout(GG.presto); GG.presto = setTimeout(() => { ggInvia().catch(e => { GG.msg = ggErrore(e); ggCambio(); }); }, 2500); }
   setInterval(() => { if (GG.user && !GG.occupato) ggInvia().catch(() => { }); }, 30000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden && GG.user && !GG.occupato) ggInvia().catch(() => { }); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && GG.user && !GG.occupato) ggInvia().catch(() => { });
+    if (!document.hidden && GG.user && !GG.allineato && !GG.blocco && !GG.occupato) ggAllinea(false);
+  });
+  addEventListener('online', () => { if (GG.user && !GG.allineato && !GG.blocco && !GG.occupato) ggAllinea(false); });
   function ggHTML(compatto) {
     if (!FIREBASE) return '';
     const s = ggStato();
@@ -988,7 +1124,7 @@
      COLLEGAMENTO CON IL GIOCO APERTO
      ========================================================= */
   let G = null;
-  const R = { code: null, uns: [], bussate: [], mia: null, bloccato: null, visInit: null, allowKey: '', pubblicata: null, pubKey: '', pubT: 0, bussato: {}, rawPosti: [] };
+  const R = { code: null, uns: [], bussate: [], mia: null, bloccato: null, visInit: null, allowKey: '', pubblicata: null, pubKey: '', pubT: 0, bussato: {}, rawPosti: [], avvisati: {} };
   function statoGioco() { if (!G) return null; try { return G.stato(); } catch (e) { return null; } }
   function collegaGioco(g) {
     G = g;
@@ -1024,6 +1160,15 @@
         R.bussate = s.docs.map(d => d.data()).filter(x => x && /^u-[A-Z0-9]{8}$/.test(x.id));
         R.bussate.forEach(b => chiediProfilo(b.id));
         const nuove = R.bussate.filter(b => !b.no && !b.visto);
+        // chi crea la stanza fa entrare da solo i suoi amici; per gli altri compare un avviso ben visibile
+        const sg = statoGioco();
+        if (sg && sg.S && sg.S.host === C.id && sg.S.status === 'lobby') {
+          nuove.filter(b => eAmico(b.id)).forEach(b => accettaBussata(b.id));
+          nuove.filter(b => !eAmico(b.id) && !R.avvisati[code + '/' + b.id]).forEach(b => {
+            R.avvisati[code + '/' + b.id] = true;
+            avviso('🚪 ' + (pulisciNome(b.nome) || 'Qualcuno') + ' chiede di entrare: premi Accetta nel riquadro "Chi può entrare".');
+          });
+        }
         render();
         if (nuove.length) suona();
       }, () => { }));
@@ -1548,6 +1693,53 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avvio); else setTimeout(avvio, 0);
 
   /* ---------------- cosa vedono i giochi e le pagine ---------------- */
+  /* =========================================================
+     VERSIONE NUOVA DEL SITO
+     Chi tiene una pagina aperta a lungo (soprattutto sul telefono) restava con
+     la versione vecchia: poteva finire su un server diverso dagli altri e non
+     vederli. Ogni 3 minuti (e al ritorno sulla pagina) si controlla se la pagina
+     o questo modulo sono cambiati: fuori dalla partita si ricarica da sola,
+     durante la partita compare un avviso con il pulsante "Aggiorna".
+     ========================================================= */
+  const VERS = { base: null, avvisato: false, ultimo: 0 };
+  async function etagDi(u) {
+    try { const r = await fetch(u, { method: 'HEAD', cache: 'no-store' }); return r.ok ? (r.headers.get('etag') || '').replace(/^W\//, '') || null : null; } catch (e) { return null; }
+  }
+  async function controllaVersione() {
+    if (!/^https?:$/.test(location.protocol) || DA_TRASLOCARE || VERS.avvisato) return;
+    VERS.ultimo = Date.now();
+    const tags = await Promise.all([location.pathname, SCRIPT && SCRIPT.src].filter(Boolean).map(etagDi));
+    if (!tags.length || tags.some(t => !t)) return;
+    const k = tags.join('|');
+    if (VERS.base === null) { VERS.base = k; return; }
+    if (k !== VERS.base) { VERS.avvisato = true; versioneNuova(); }
+  }
+  function versioneNuova() {
+    const st = statoGioco();
+    const inPartita = !!(st && st.view === 'game');
+    const att = document.activeElement;
+    const scrivendo = [...document.querySelectorAll('textarea')].some(el => (el.value || '').trim() && el.offsetParent !== null)
+      || !!(att && /^(INPUT|TEXTAREA)$/.test(att.tagName) && (att.value || '').trim());
+    let prima = 0; try { prima = +sessionStorage.getItem('tv-aggiornata') || 0; } catch (e) { }
+    if (!inPartita && !scrivendo && Date.now() - prima > 10 * 60000) {
+      try { sessionStorage.setItem('tv-aggiornata', String(Date.now())); } catch (e) { }
+      location.reload(); return;
+    }
+    if (document.getElementById('tv-versione')) return;
+    const b = document.createElement('div');
+    b.id = 'tv-versione';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:9700;background:#1d2440;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px 10px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.45);font:600 14px/1.3 system-ui,sans-serif;max-width:calc(100vw - 24px)';
+    b.innerHTML = '<span>🔄 È uscita una versione nuova di Tavolata.</span><button type="button" style="border:0;border-radius:10px;padding:7px 12px;font:800 14px system-ui,sans-serif;background:#ffcf4a;color:#1d2440;cursor:pointer">Aggiorna</button><button type="button" aria-label="Chiudi" style="border:0;background:none;color:#fff;font-size:18px;cursor:pointer;opacity:.7">✕</button>';
+    const [agg, chiudi] = b.querySelectorAll('button');
+    agg.onclick = () => { try { sessionStorage.setItem('tv-aggiornata', String(Date.now())); } catch (e) { } location.reload(); };
+    chiudi.onclick = () => b.remove();
+    (document.body || document.documentElement).appendChild(b);
+  }
+  setTimeout(controllaVersione, 1500);
+  setInterval(controllaVersione, 3 * 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - VERS.ultimo > 60000) controllaVersione(); });
+
   window.Tavolata = {
     get id() { return C.id; },
     nome: () => C.nome,
@@ -1562,6 +1754,7 @@
     seguiProfilo: id => { chiediProfilo(id); sub('presenza/' + id); },
     online, statoAmico, linkDispositivo, collegaDa, codiceAmico, idDaCodice, EMOJI, COLORI, BASE, QS,
     collegato: () => Net.ok, esc, quando, render,
+    broker: BROKER, controllaVersione, controllaConnessioni: subito => CLIENTI.forEach(c => { try { c.tvControlla(!!subito); } catch (e) { } }),
     kofi: KOFI, donaHTML: donaBreveHTML,
     lingua: LINGUA, lingue: Object.assign({}, LINGUE), t: traduci, linguaHTML, traduciPagina: () => trAlbero(document),
     /* parola tradotta → parola italiana (per i giochi di parole: i confronti si fanno sempre in italiano) */

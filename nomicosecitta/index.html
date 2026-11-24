@@ -1175,7 +1175,7 @@ function makeLocalKV(){
    RETE SENZA ACCOUNT: server pubblico MQTT (messaggi "conservati")
    Ogni documento è un messaggio conservato sul tema tavolata-nomicosecitta/v1/<percorso>
    ========================================================= */
-const BROKER=(()=>{try{const q=new URLSearchParams(location.search);if(q.get('broker'))return q.get('broker');}catch(e){}return'wss://test.mosquitto.org:8081/mqtt';})();
+const BROKER=(()=>{try{const q=new URLSearchParams(location.search);if(q.get('broker'))return q.get('broker');}catch(e){}return((window.Tavolata&&Tavolata.broker)||'wss://test.mosquitto.org:8081/mqtt');})();
 const TP='tavolata-nomicosecitta/v1/';
 const Net={client:null,status:'',cache:new Map(),L:new Set(),subs:new Set(),ready:null,nt:null,
   setStatus(s){this.status=s;document.querySelectorAll('.netst').forEach(el=>el.textContent=netText());},
