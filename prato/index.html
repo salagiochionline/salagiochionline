@@ -311,7 +311,7 @@ const MAPS = [
     path: [P.stone, P.stoneHi, P.stoneLo], inside: [[34, 40, 't0'], [92, 86, 't3']], outside: { trees: 0.6, count: 150 },
   },
   {
-    id: 'park', name: 'PARCO', season: 'ESTATE', desc: 'ESTATE, ERBA X5', size: 144, value: 5, price: 60000, reb: 0, icon: 'clover',
+    id: 'park', name: 'PARCO', season: 'ESTATE', desc: 'ESTATE, ERBA X4', size: 160, value: 4, price: 0, reb: 0, icon: 'clover',
     tall: { base: '#3a9a3a', mid: '#2a7a30', hi: '#6cc040', tip: '#c8e860' }, tallB: { base: '#44a640', mid: '#328436', hi: '#7ccc48', tip: '#d8f070' },
     cut: { cut: '#88c858', speck: '#c8ec88', shadow: '#5c9a40' },
     wild: { base: '#7a8a3a', mid: '#5f6e2e', hi: '#a8a84a', tip: '#e0d070', flower: 0.12 },
@@ -320,7 +320,7 @@ const MAPS = [
     path: ['#c9b9a0', '#e6d8bf', '#9c8c74'], inside: [[30, 30, 't1'], [110, 40, 't2'], [70, 72, 't4'], [36, 112, 't3'], [112, 116, 't0']], outside: { trees: 0.45, count: 190 },
   },
   {
-    id: 'golf', name: 'CAMPO DA GOLF', season: 'AUTUNNO', desc: 'AUTUNNO, ERBA X25', size: 160, value: 25, price: 3000000, reb: 2, icon: 'flag',
+    id: 'golf', name: 'CAMPO DA GOLF', season: 'AUTUNNO', desc: 'AUTUNNO, ERBA X10', size: 192, value: 10, price: 0, reb: 0, icon: 'flag',
     tall: { base: '#5e8a2e', mid: '#4a6e28', hi: '#8aa83a', tip: '#c8b44a' }, tallB: { base: '#689430', mid: '#54782a', hi: '#98b440', tip: '#d8c058' },
     cut: { cut: '#8ab050', speck: '#c0d478', shadow: '#68903c' },
     wild: { base: '#8a6a2a', mid: '#6e5020', hi: '#b8862e', tip: '#e0a040', flower: 0 },
@@ -329,7 +329,7 @@ const MAPS = [
     path: ['#e8e0cc', '#fffaf0', '#bcb29c'], inside: [], flags: [[40, 44], [120, 50], [80, 120], [130, 130]], bunkers: 9, outside: { trees: 0.75, count: 170 },
   },
   {
-    id: 'farm', name: 'FATTORIA', season: 'INVERNO', desc: 'INVERNO, ENORME, ERBA X125', size: 192, value: 125, price: 200000000, reb: 5, icon: 'hay',
+    id: 'farm', name: 'FATTORIA', season: 'INVERNO', desc: 'INVERNO, ENORME, ERBA X30', size: 224, value: 30, price: 0, reb: 0, icon: 'hay',
     tall: { base: '#4a7a5a', mid: '#3a6650', hi: '#8ab8a0', tip: '#e8f4f0' }, tallB: { base: '#548466', mid: '#42705a', hi: '#9cc8b0', tip: '#f4fcff' },
     cut: { cut: '#a8c8b8', speck: '#ffffff', shadow: '#7aa090' },
     wild: { base: '#e8eef8', mid: '#c8d4e8', hi: '#ffffff', tip: '#ffffff', flower: 0 },
@@ -375,11 +375,12 @@ function buildSprites(m) {
 }
 
 // ---------------- stato del prato ----------------
-let grow, stripe, variant, gold, patch, cutN;
+let grow, stripe, variant, gold, patch, cutN, burnt;
 let cutCount = 0, cuttable = 1;
 function buildLawn(m, seed) {
   grow = new Float32Array(N * N).fill(1);
-  cutN = new Uint8Array(N * N);   // quante volte è stata tagliata ogni cella (decide i ciuffi d'oro uguali per tutti)
+  cutN = new Uint8Array(N * N);
+  burnt = new Uint8Array(N * N);   // erba bruciata dal lanciafiamme (si schiarisce piano)   // quante volte è stata tagliata ogni cella (decide i ciuffi d'oro uguali per tutti)
   stripe = new Uint8Array(N * N);
   variant = new Uint8Array((N + CFG.margin * 2) ** 2);
   { const r = rng(9 + seed); for (let i = 0; i < variant.length; i++) variant[i] = (r() * VAR) | 0; }
@@ -547,6 +548,56 @@ function drawWeather(t) {
   }
 }
 let mapIdx = 0;
+// L'erba non ricresce da sola: ogni prato si ricorda cosa hai già tagliato (anche tra un viaggio e l'altro).
+const LAWN_KEY = 'prato-prati-v3';
+let lawnStore = (() => { try { const o = JSON.parse(localStorage.getItem(LAWN_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+function encodeLawn() {
+  const out = []; let prev = -1, run = 0;
+  for (let q = 0; q < grow.length; q++) {
+    const g = grow[q];
+    const c = g < 0 ? 0 : Math.round(g * 15) + (gold[q] ? 16 : 0);
+    if (c === prev) run++;
+    else { if (run) out.push(prev.toString(32) + (run > 1 ? run.toString(36) : '')); prev = c; run = 1; }
+  }
+  if (run) out.push(prev.toString(32) + (run > 1 ? run.toString(36) : ''));
+  return out.join(',');
+}
+function decodeLawn(str) {
+  if (!str) return false;
+  const codes = new Uint8Array(grow.length); let q = 0;
+  for (const tk of str.split(',')) {
+    const c = parseInt(tk[0], 32), n = tk.length > 1 ? parseInt(tk.slice(1), 36) : 1;
+    if (!(c >= 0) || !(n > 0) || q + n > codes.length) return false;
+    codes.fill(c, q, q + n); q += n;
+  }
+  if (q !== codes.length) return false;
+  for (let k = 0; k < codes.length; k++) { if (grow[k] < 0) continue; grow[k] = (codes[k] & 15) / 15; gold[k] = codes[k] >> 4 & 1; }
+  return true;
+}
+const lawnMine = () => !state.coop || (typeof S !== 'undefined' && S && S.host === myId && mapIdx === state.map);
+function storeLawn() {
+  if (!grow || !lawnMine() || resetting) return;
+  const id = MAPS[mapIdx].id;
+  lawnStore[id] = { g: encodeLawn(), p: Math.floor(cutCount / cuttable * 1000) / 1000 };
+  try { localStorage.setItem(LAWN_KEY, JSON.stringify(lawnStore)); } catch (e) { }
+}
+function lawnPct(id) {
+  if (state.done[id]) return 1;
+  if (id === MAPS[mapIdx].id && lawnMine() && cuttable > 1) return cutCount / cuttable;
+  return (lawnStore[id] && lawnStore[id].p) || 0;
+}
+// costruisce il prato e (se è il tuo) rimette l'erba come l'avevi lasciata
+function openMap(i, load = true) {
+  buildMap(i);
+  if (load) decodeLawn(lawnStore[MAPS[i].id] && lawnStore[MAPS[i].id].g);
+  countLawn(); state.full = cutCount >= cuttable;
+  state.rain = null; state.rainT = 45 + Math.random() * 30;
+}
+function countLawn() {
+  let cc = 0, ct = 0;
+  for (let q = 0; q < grow.length; q++) { const v = grow[q]; if (v < 0) continue; ct++; if (v < 0.35) cc++; }
+  cutCount = cc; cuttable = Math.max(1, ct);
+}
 function buildMap(i) {
   mapIdx = i;
   const m = MAPS[i];
@@ -731,7 +782,7 @@ addEventListener('keydown', (e) => {
   if (state.screen === 'travel') { if (state.screenT > 1.8 && (e.code === 'Enter' || e.code === 'Space')) state.screenT = 99; return; }
   if (e.code === 'KeyH') state.help = !state.help;
   if (e.code === 'KeyE') { state.shop = !state.shop; state.tree = false; state.shop ? sfx.open() : sfx.close(); state.uiT = state.time; }
-  const dg = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[e.code];
+  const dg = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5 }[e.code];
   if (dg !== undefined && TOOLS[dg]) selectTool(TOOLS[dg].id);
   if (e.code === 'KeyK') { state.tree = !state.tree; state.shop = false; state.tree ? sfx.open() : sfx.close(); state.uiT = state.time; }
   if (e.code === 'Escape') { state.shop = false; state.tree = false; }
@@ -776,14 +827,22 @@ const joy = { on: false, x: 0, y: 0, id: null };
 
 // ---------------- potenziamenti (negozio) ----------------
 const UPG = [
-  { id: 'blade', name: 'LAMA LARGA', desc: 'TAGLI UNA STRISCIA PIU LARGA', base: 25, k: 1.75, max: 12, icon: 'blade' },
-  { id: 'speed', name: 'PASSO SVELTO', desc: '+8% VELOCITA', base: 20, k: 1.7, max: 12, icon: 'bolt' },
-  { id: 'value', name: 'ERBA DI QUALITA', desc: '+25% MONETE PER CIUFFO', base: 40, k: 1.8, max: 25, icon: 'coin' },
-  { id: 'grow', name: 'CONCIME', desc: "L'ERBA RICRESCE PRIMA", base: 35, k: 1.8, max: 10, icon: 'drop' },
+  { id: 'blade', name: 'LAMA LARGA', desc: 'TAGLI UNA STRISCIA PIU LARGA', base: 50, k: 2.6, max: 10, icon: 'blade' },
+  { id: 'speed', name: 'PASSO SVELTO', desc: '+6% VELOCITA', base: 40, k: 2.5, max: 10, icon: 'bolt' },
+  { id: 'value', name: 'ERBA DI QUALITA', desc: '+25% MONETE PER CIUFFO', base: 60, k: 2.3, max: 20, icon: 'coin' },
+  { id: 'xp', name: 'QUADERNO DEL GIARDINIERE', desc: '+15% ESPERIENZA', base: 30, k: 1.8, max: 10, icon: 'book' },
   { id: 'gold', name: 'ERBA DORATA', desc: "PIU CIUFFI D'ORO (X10)", base: 120, k: 1.95, max: 10, icon: 'star' },
   { id: 'luck', name: 'FORTUNA', desc: 'PIU BONUS NASCOSTI', base: 90, k: 1.9, max: 8, icon: 'clover' },
 ];
 const upgCost = (u) => Math.ceil(u.base * Math.pow(u.k, state.upg[u.id]));
+// livello massimo che puoi comprare adesso: cresce con i prati sbloccati (così ogni prato ha i suoi acquisti)
+// (lama e passo: +1 livello per ogni rinascita, fino al massimo)
+const UPG_CAP = { blade: [3, 5, 7, 8], speed: [3, 5, 7, 8], value: [5, 10, 15, 20], gold: [3, 5, 8, 10], luck: [2, 4, 6, 8] };
+function upgMax(u) {
+  const c = UPG_CAP[u.id]; if (!c) return u.max;
+  const n = MAPS.filter((m) => state.maps[m.id]).length;
+  return Math.min(u.max, c[Math.max(0, n - 1)] + (u.id === 'blade' || u.id === 'speed' ? state.rebirths : 0));
+}
 
 // bonus temporanei trovati nell'erba
 const PU = {
@@ -794,10 +853,12 @@ const PU = {
 
 // ---------------- attrezzi: ognuno taglia in modo diverso ----------------
 const TOOLS = [
-  { id: 'mower', name: 'TOSAERBA', desc: 'TAGLIA UNA STRISCIA DAVANTI A TE', price: 0, icon: 'mower', speed: 1 },
-  { id: 'trimmer', name: 'DECESPUGLIATORE', desc: 'TAGLIA TUTTO ATTORNO, ANCHE DA FERMO', price: 1500, icon: 'trimmer', speed: 0.9 },
-  { id: 'scythe', name: 'FALCE', desc: 'COLPI LARGHI CAMMINANDO, ERBA X1,5', price: 25000, icon: 'scythe', speed: 0.85 },
-  { id: 'blower', name: 'SOFFIATORE', desc: 'TAGLIA LONTANO E ATTIRA BONUS E ORO', price: 400000, icon: 'blower', speed: 1.05 },
+  { id: 'scissors', name: 'FORBICI', desc: 'UN CIUFFO ALLA VOLTA: CI VUOLE PAZIENZA', price: 0, icon: 'scissors', speed: 0.85 },
+  { id: 'mower', name: 'TOSAERBA', desc: 'TAGLIA UNA STRISCIA DAVANTI A TE', price: 300, icon: 'mower', speed: 1 },
+  { id: 'trimmer', name: 'DECESPUGLIATORE', desc: 'TAGLIA TUTTO ATTORNO, ANCHE DA FERMO', price: 2500, icon: 'trimmer', speed: 0.9 },
+  { id: 'scythe', name: 'FALCE', desc: 'COLPI LARGHI CAMMINANDO, ERBA X1,5', price: 20000, icon: 'scythe', speed: 0.85 },
+  { id: 'blower', name: 'SOFFIATORE', desc: 'TAGLIA LONTANO E ATTIRA BONUS E ORO', price: 2000000, icon: 'blower', speed: 1.05 },
+  { id: 'flame', name: 'LANCIAFIAMME', desc: "BRUCIA L'ERBA LONTANO DAVANTI A TE", price: 20000000, icon: 'torch', speed: 1.1 },
 ];
 const TOOL = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -826,14 +887,20 @@ const SEEDS = [
   { id: 'roots', name: 'RADICI PROFONDE', desc: '+25% MONETE PER SEMPRE', base: 1, k: 1.45, max: 30, icon: 'coin' },
   { id: 'start', name: 'PARTENZA RAPIDA', desc: 'RICOMINCI CON PIU MONETE', base: 2, k: 2.2, max: 6, icon: 'bolt' },
   { id: 'wisdom', name: 'SAGGEZZA', desc: '+20% ESPERIENZA', base: 2, k: 1.6, max: 10, icon: 'star' },
-  { id: 'fertile', name: 'TERRA FERTILE', desc: "L'ERBA RICRESCE 10% PRIMA", base: 3, k: 1.8, max: 5, icon: 'drop' },
+  { id: 'sereno', name: 'CIELO SERENO', desc: 'LA PIOGGIA ARRIVA 10% PIU DI RADO', base: 3, k: 1.8, max: 5, icon: 'sun' },
   { id: 'golden', name: 'SEME D\'ORO', desc: "+50% CIUFFI D'ORO", base: 3, k: 1.8, max: 5, icon: 'seed' },
   { id: 'family', name: 'ATTREZZI DI FAMIGLIA', desc: 'TIENI GLI ATTREZZI QUANDO RINASCI', base: 8, k: 1, max: 1, icon: 'trimmer' },
 ];
 const su = (id) => state.seedUpg[id] || 0;
 const seedCost = (u) => Math.ceil(u.base * Math.pow(u.k, su(u.id)));
-const REBIRTH_MIN = 1e6;
-const seedsFor = (earned) => (earned < REBIRTH_MIN ? 0 : Math.floor(Math.sqrt(earned / 1e5)));
+// semi d'oro: tanti più prati hai finito (e più sono grandi), metà per il prato a cui sei arrivato
+const SEMI_PRATO = [2, 5, 12, 30];
+function seedsNow() {
+  if (!state.done.garden) return 0;
+  let n = 0;
+  MAPS.forEach((m, i) => { if (state.done[m.id]) n += SEMI_PRATO[i]; else if (state.maps[m.id]) n += SEMI_PRATO[i] * 0.5 * lawnPct(m.id); });
+  return Math.floor(n * (1 + 0.1 * state.rebirths));
+}
 function buySeed(u) {
   if (su(u.id) >= u.max) return;
   if (state.seeds < seedCost(u)) { sfx.deny(); return; }
@@ -844,20 +911,22 @@ function buySeed(u) {
   save();
 }
 function rebirth() {
-  const gain = seedsFor(state.runEarned);
+  const gain = seedsNow();
   if (gain <= 0 || state.coop) return;
+  lawnStore = {}; try { localStorage.removeItem(LAWN_KEY); } catch (e) { }
+  state.done = {};
   state.seeds += gain;
   state.rebirths++;
   state.runEarned = 0;
-  state.coins = su('start') ? 500 * Math.pow(6, su('start')) : 0;
+  state.coins = su('start') ? 50 * Math.pow(5, su('start')) : 0;
   for (const u of UPG) state.upg[u.id] = 0;
-  if (!su('family')) { state.tools = { mower: 1 }; state.tool = 'mower'; }
+  if (!su('family')) { state.tools = { scissors: 1 }; state.tool = 'scissors'; }
   state.maps = { garden: 1 };
   state.level = 1; state.xp = 0; state.points = 0; state.skills = {};
   state.combo = 1; state.active = {};
   state.shop = false; state.tree = false;
   state.screen = 'game';
-  arrive(0);
+  arrive(0, true);
   state.banner = { text: 'RINASCITA!', sub: '+' + gain + ' SEMI D\'ORO', t: 0 };
   for (let q = 0; q < 6; q++) firework();
   sfx.rebirth();
@@ -868,7 +937,6 @@ function rebirth() {
 const EVENTS = {
   mole: { name: 'UNA TALPA!', sub: 'PRENDILA PRIMA CHE SCAPPI', dur: 18, chip: 'TALPA', tone: 'red' },
   weed: { name: 'ERBACCIA GIGANTE!', sub: 'TAGLIALA PER UN PREMIO', dur: 40, chip: 'ERBACCIA', tone: 'red' },
-  rain: { name: 'PIOGGIA!', sub: "L'ERBA CRESCE X4", dur: 22, chip: 'PIOGGIA', tone: 'green' },
   dog: { name: 'UN CANE!', sub: 'SCAVA MONETE: RACCOGLILE', dur: 25, chip: 'CANE', tone: 'gold' },
 };
 // un punto nel prato non troppo lontano dal giocatore
@@ -997,15 +1065,52 @@ function drawEvents(t) {
     px(vg, x - 4 + leg, y - 3, P.ink, 2, 3); px(vg, x + 3 - leg, y - 3, P.ink, 2, 3);     // zampe
   }
 }
+// nuvola che piove (coordinate del prato)
+function drawRainWorld(t) {
+  const rn = state.rain; if (!rn) return;
+  const k = Math.min(1, rn.t / 1.5, (rn.dur - rn.t) / 1.5);
+  vg.fillStyle = `rgba(30,40,90,${(0.22 * k).toFixed(3)})`;
+  ellipse(rn.x, rn.y, rn.r, rn.r * 0.9);
+  vg.fillStyle = `rgba(210,230,255,${(0.85 * k).toFixed(3)})`;
+  for (let q = 0; q < 70; q++) {
+    const a = q * 2.399, d = Math.sqrt((q * 0.618) % 1) * rn.r * 0.95;
+    const fall = ((t * 3 + q * 0.37) % 1);
+    const x = rn.x + Math.cos(a) * d, y = rn.y + Math.sin(a) * d * 0.9 - 20 + fall * 22;
+    vg.fillRect(Math.round(x), Math.round(y), 1, 5);
+  }
+}
+function drawCloud(t) {
+  const rn = state.rain; if (!rn) return;
+  const k = Math.min(1, rn.t / 1.5, (rn.dur - rn.t) / 1.5);
+  vg.globalAlpha = 0.75 * k;
+  const cy = rn.y - 46;
+  for (let q = 0; q < 7; q++) {
+    const a = q / 7 * Math.PI * 2 + t * 0.2, rr = rn.r * (0.38 + 0.12 * Math.sin(q * 1.7));
+    vg.fillStyle = '#6c7aa8'; ellipse(rn.x + Math.cos(a) * rn.r * 0.45, cy + Math.sin(a) * rn.r * 0.18 + 4, rr, rr * 0.55);
+  }
+  for (let q = 0; q < 7; q++) {
+    const a = q / 7 * Math.PI * 2 + t * 0.2, rr = rn.r * (0.34 + 0.12 * Math.sin(q * 1.7));
+    vg.fillStyle = '#9aa6cc'; ellipse(rn.x + Math.cos(a) * rn.r * 0.42, cy + Math.sin(a) * rn.r * 0.16, rr, rr * 0.5);
+  }
+  vg.globalAlpha = 1;
+}
+// velo blu sullo schermo quando sei sotto la nuvola
 function drawRain(t) {
-  if (state.event?.type !== 'rain') return;
-  const k = Math.min(1, state.event.t / 1.5, (state.event.dur - state.event.t) / 1.5);
-  vg.fillStyle = `rgba(40,60,120,${(0.24 * k).toFixed(3)})`;
+  const rn = state.rain; if (!rn) return;
+  const d = Math.hypot(state.x - rn.x, state.y - rn.y);
+  const k = Math.min(1, rn.t / 1.5, (rn.dur - rn.t) / 1.5) * clamp(1.4 - d / rn.r, 0, 1);
+  if (k <= 0) return;
+  vg.fillStyle = `rgba(40,60,120,${(0.18 * k).toFixed(3)})`;
   vg.fillRect(0, 0, VW, VH);
-  vg.fillStyle = `rgba(210,230,255,${(0.9 * k).toFixed(3)})`;
-  for (let q = 0; q < 120; q++) {
-    const x = (q * 137 + t * 40) % (VW + 20) - 10, y = (q * 71 + t * 260) % (VH + 20) - 10;
-    vg.fillRect(Math.round(x), Math.round(y), 1, 6);
+}
+// ultimi ciuffi: riquadri che lampeggiano sul prato
+function drawLeft(t) {
+  if (!left.on || state.screen !== 'game') return;
+  if (Math.sin(t * 8) < -0.3) return;
+  vg.fillStyle = 'rgba(255,242,163,0.9)';
+  for (const q of left.list) {
+    const x = LAWN0 + (q % N) * C, y = LAWN0 + ((q / N) | 0) * C;
+    vg.fillRect(x - 1, y - 1, C + 2, 1); vg.fillRect(x - 1, y + C, C + 2, 1); vg.fillRect(x - 1, y, 1, C); vg.fillRect(x + C, y, 1, C);
   }
 }
 
@@ -1022,9 +1127,10 @@ function travel(i) {
   state.screen = 'travel'; state.screenT = 0; state.travelTo = i; state.travelDone = false; state.travelShared = false;
   sfx.travel();
 }
-function arrive(i) {
+function arrive(i, fresh) {
+  if (!fresh) storeLawn();
   state.map = i;
-  buildMap(i);
+  openMap(i, !fresh);
   placePlayer(state.coop ? seatIndex(myId) : 0);
   if (state.coop) { state.coop.travelTo = undefined; coopAskSnap(true); }
   cam.x = state.x; cam.y = state.y - 10;
@@ -1048,7 +1154,7 @@ function updateTravel(dt) {
 }
 function startGame() {
   audioInit(); sfx.open();
-  if (mapIdx !== state.map) { buildMap(state.map); placePlayer(0); }
+  if (mapIdx !== state.map) { openMap(state.map); placePlayer(0); }
   state.screen = 'game'; state.screenT = 0; state.settings = false;
   cam.x = state.x; cam.y = state.y - 10;
   startSession(false);
@@ -1061,6 +1167,7 @@ function newGame() {
   const keep = { vol: state.vol, help: state.help, shakeOn: state.shakeOn, ep: Date.now(), ts: Date.now() };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(keep)); } catch (e) { /* niente */ }
   writeRecs(readRecs().filter((r) => !r.sv));
+  try { localStorage.removeItem(LAWN_KEY); } catch (e) { /* niente */ }
   try { sessionStorage.setItem('prato-nuova', '1'); } catch (e) { /* niente */ }
   location.reload();
 }
@@ -1073,34 +1180,24 @@ function firework() {
     particles.push({ ui: true, x, y, z: 0, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, vz: 0, t: 0, life: 1.1, col });
   }
 }
-function buyMap(i) {
-  const m = MAPS[i];
-  if (state.maps[m.id]) return;
-  if (state.coins < m.price || !state.maps[MAPS[i - 1].id] || state.rebirths < m.reb) { sfx.deny(); return; }
-  state.coins -= m.price;
-  state.maps[m.id] = 1;
-  save(); syncSave(true);
-  if (state.coop && (!S || S.host !== myId)) { sfx.buy(); toast('Prato comprato: lo trovi quando giochi da solo'); return; }
-  travel(i);
-}
+function buyMap() { sfx.deny(); }
 function drawMapRows(row) {
   MAPS.forEach((m, i) => {
-    const own = state.maps[m.id], here = state.map === i;
-    const needReb = !own && state.rebirths < m.reb;
-    const locked = !own && (needReb || (i > 0 && !state.maps[MAPS[i - 1].id]));
+    const own = state.maps[m.id], done = state.done[m.id], prev = MAPS[i - 1];
+    const pct = Math.floor(lawnPct(m.id) * 100) + '%';
+    const lock = prev ? 'FINISCI IL ' + prev.name + ' PER SBLOCCARLO' : '';
     if (state.coop) {
-      // insieme: il prato lo sceglie chi ha creato la stanza; gli altri possono comprare i prati per dopo
+      // insieme: il prato lo sceglie chi ha creato la stanza
       const shared = mapIdx === i, boss = S && S.host === myId;
-      row(i, m.icon, m.name, shared ? 'IL PRATO DI TUTTI ADESSO' : own ? (boss ? 'PORTA TUTTI QUI' : 'LO SCEGLIE CHI HA CREATO') : needReb ? 'SERVONO ' + m.reb + ' RINASCITE (ORA ' + state.rebirths + ')' : m.desc, m.size + 'X' + m.size,
-        own || shared ? { label: shared ? 'SIETE QUI' : boss ? 'VAI' : 'DA SOLO' } : locked ? { label: needReb ? m.reb + ' RINASCITE' : 'BLOCCATO' } : { cost: m.price },
-        shared ? 'gold' : own ? (boss ? 'green' : 'gray') : !locked && state.coins >= m.price ? 'green' : 'gray',
-        () => (own ? travel(i) : buyMap(i)));
+      row(i, m.icon, m.name, shared ? 'IL PRATO DI TUTTI ADESSO' : own ? (boss ? 'PORTA TUTTI QUI' : 'LO SCEGLIE CHI HA CREATO') : lock, shared ? Math.floor(cutCount / cuttable * 100) + '%' : own ? pct : m.size + 'X' + m.size,
+        own || shared ? { label: shared ? 'SIETE QUI' : boss ? 'VAI' : 'DA SOLO' } : { label: 'BLOCCATO' },
+        shared ? 'gold' : own && boss ? 'green' : 'gray', () => (own ? travel(i) : sfx.deny()));
       return;
     }
-    row(i, m.icon, m.name, needReb ? 'SERVONO ' + m.reb + ' RINASCITE (ORA ' + state.rebirths + ')' : m.desc, m.size + 'X' + m.size,
-      own ? { label: here ? 'SEI QUI' : 'VAI' } : locked ? { label: needReb ? m.reb + ' RINASCITE' : 'BLOCCATO' } : { cost: m.price },
-      own ? (here ? 'gold' : 'green') : !locked && state.coins >= m.price ? 'green' : 'gray',
-      () => (own ? travel(i) : buyMap(i)));
+    const here = state.map === i;
+    row(i, m.icon, m.name, own ? m.desc + (done ? ' · FINITO' : '') : lock, own ? pct : m.size + 'X' + m.size,
+      own ? { label: here ? 'SEI QUI' : 'VAI' } : { label: 'BLOCCATO' },
+      own ? (here ? 'gold' : 'green') : 'gray', () => (own ? travel(i) : sfx.deny()));
   });
 }
 
@@ -1109,6 +1206,7 @@ function drawMapRows(row) {
 const BRANCH = {
   cut: { name: 'TAGLIO', col: '#ff7d5e', tone: 'red' },
   nat: { name: 'NATURA', col: '#7fdc5a', tone: 'green' },
+  sky: { name: 'CIELO', col: '#7fc8ff', tone: 'blue' },
   luck: { name: 'FORTUNA', col: '#ffd23f', tone: 'gold' },
 };
 const SKILLS = [
@@ -1117,11 +1215,16 @@ const SKILLS = [
   { id: 'c3', br: 'cut', gx: 0, gy: 2, req: 'c2', max: 1, cost: 2, icon: 'flame', name: 'COMBO', desc: "TAGLIA ERBA ALTA SENZA FERMARTI: MONETE FINO A X2" },
   { id: 'c4', br: 'cut', gx: -1, gy: 3, req: 'c3', max: 1, cost: 3, icon: 'flame2', name: 'COMBO INFUOCATA', desc: 'LA COMBO ARRIVA FINO A X3' },
   { id: 'c5', br: 'cut', gx: 1, gy: 3, req: 'c3', max: 1, cost: 3, icon: 'wave', name: 'FALCIATA', desc: 'OGNI 8 S DI TAGLIO: ONDATA CHE TAGLIA TUTTO ATTORNO' },
-  { id: 'n1', br: 'nat', gx: 0, gy: 0, max: 3, cost: 1, icon: 'drop', name: 'RADICI FORTI', desc: "L'ERBA RICRESCE 8% PRIMA" },
-  { id: 'n2', br: 'nat', gx: 0, gy: 1, req: 'n1', max: 3, cost: 1, icon: 'leaf', name: 'ERBA RIGOGLIOSA', desc: "+15% MONETE DALL'ERBA ALTA" },
-  { id: 'n3', br: 'nat', gx: 0, gy: 2, req: 'n2', max: 2, cost: 2, icon: 'star', name: "SEMI D'ORO", desc: "+40% CIUFFI D'ORO" },
+  { id: 'n1', br: 'nat', gx: 0, gy: 0, max: 3, cost: 1, icon: 'leaf', name: 'ERBA RIGOGLIOSA', desc: "+15% MONETE DALL'ERBA ALTA" },
+  { id: 'n2', br: 'nat', gx: 0, gy: 1, req: 'n1', max: 2, cost: 1, icon: 'star', name: "SEMI D'ORO", desc: "+40% CIUFFI D'ORO" },
+  { id: 'n3', br: 'nat', gx: 0, gy: 2, req: 'n2', max: 1, cost: 2, icon: 'eye', name: 'OCCHIO VERDE', desc: "LE FRECCE VERSO L'ULTIMA ERBA COMPAIONO PRIMA" },
   { id: 'n4', br: 'nat', gx: -1, gy: 3, req: 'n3', max: 1, cost: 3, icon: 'coin', name: "TOCCO D'ORO", desc: "I CIUFFI D'ORO VALGONO X15" },
   { id: 'n5', br: 'nat', gx: 1, gy: 3, req: 'n3', max: 1, cost: 3, icon: 'sun', name: 'RUGIADA', desc: "ALL'ALBA LE MONETE VALGONO X2" },
+  { id: 'r1', br: 'sky', gx: 0, gy: 0, max: 3, cost: 1, icon: 'sun', name: 'PREVISIONI', desc: 'LA PIOGGIA ARRIVA 20% PIU TARDI' },
+  { id: 'r2', br: 'sky', gx: 0, gy: 1, req: 'r1', max: 3, cost: 1, icon: 'drop', name: 'PIOGGERELLA', desc: "SOTTO LA PIOGGIA L'ERBA CRESCE 25% PIU PIANO" },
+  { id: 'r3', br: 'sky', gx: 0, gy: 2, req: 'r2', max: 2, cost: 2, icon: 'cloud', name: 'NUVOLE PICCOLE', desc: 'LE NUVOLE SONO 15% PIU PICCOLE' },
+  { id: 'r4', br: 'sky', gx: -1, gy: 3, req: 'r3', max: 1, cost: 3, icon: 'clock', name: 'ACQUAZZONE', desc: 'LA PIOGGIA DURA 35% DI MENO' },
+  { id: 'r5', br: 'sky', gx: 1, gy: 3, req: 'r3', max: 1, cost: 3, icon: 'rainbow', name: 'ARCOBALENO', desc: 'DOPO LA PIOGGIA, 30 S DI MONETE X2' },
   { id: 'l1', br: 'luck', gx: 0, gy: 0, max: 3, cost: 1, icon: 'clover', name: 'QUADRIFOGLIO', desc: '+20% BONUS NASCOSTI' },
   { id: 'l2', br: 'luck', gx: 0, gy: 1, req: 'l1', max: 3, cost: 1, icon: 'clock', name: 'BONUS LUNGHI', desc: '+25% DURATA DEI BONUS' },
   { id: 'l3', br: 'luck', gx: 0, gy: 2, req: 'l2', max: 2, cost: 2, icon: 'dice', name: 'COLPO DI FORTUNA', desc: '2% DEI CIUFFI ALTI VALE X5' },
@@ -1161,7 +1264,7 @@ const state = {
   shop: false, tree: false, banner: null,
   skills: {},            // abilità imparate: id -> livello
   combo: 1, comboT: 0, sweepT: 0,
-  tools: { mower: 1 }, tool: 'mower', shopTab: 'upg',
+  tools: { scissors: 1 }, tool: 'scissors', shopTab: 'upg', done: {}, rain: null, rainT: 60, rainbow: 0, full: false, snipT: 0,
   map: 0, maps: { garden: 1 },
   screen: 'home', screenT: 0, travelTo: -1, travelDone: false, confirmNew: 0,
   playTime: 0, earned: 0, ended: false,
@@ -1304,7 +1407,7 @@ function musicTick() {
   }
 }
 // effetti (con un limite per non fare una cacofonia), ognuno nel suo canale
-const SFX_BUS = { cicada: 'amb', crow: 'amb', click: 'ui', buy: 'ui', deny: 'ui', open: 'ui', close: 'ui', tool: 'ui', chop: 'tools', swing: 'tools', bird: 'amb' };
+const SFX_BUS = { cicada: 'amb', crow: 'amb', click: 'ui', buy: 'ui', deny: 'ui', open: 'ui', close: 'ui', tool: 'ui', chop: 'tools', swing: 'tools', snip: 'tools', bird: 'amb' };
 function canPlay(name, gap) {
   if (!AU.ctx || AU.ctx.state !== 'running') return false;
   const now = AU.ctx.currentTime;
@@ -1334,6 +1437,7 @@ const sfx = {
   bird() { if (!canPlay('bird', 0.5)) return; const t = AU.ctx.currentTime, f = 2200 + Math.random() * 1500, n = 2 + ((Math.random() * 3) | 0); for (let i = 0; i < n; i++) tone(f * (1 + Math.random() * 0.15), t + i * 0.11, 0.09, { vol: 0.025, slide: f * 1.3 }); },
   cicada() { if (!canPlay('cicada', 2)) return; const t = AU.ctx.currentTime; for (let i = 0; i < 14; i++) noise(t + i * 0.09, 0.07, { f: 4800 + Math.random() * 600, q: 6, vol: 0.02 }); },
   crow() { if (!canPlay('crow', 3)) return; const t = AU.ctx.currentTime; for (let i = 0; i < 2; i++) tone(520, t + i * 0.3, 0.2, { type: 'sawtooth', vol: 0.012, lp: 1200, slide: 380 }); },
+  snip() { if (!canPlay('snip', 0.12)) return; const t = AU.ctx.currentTime; noise(t, 0.035, { type: 'highpass', f: 5200, vol: 0.06 }); tone(2400, t + 0.012, 0.03, { type: 'square', vol: 0.012, lp: 5000 }); },
   pop() { if (!canPlay('pop', 0.12)) return; const t = AU.ctx.currentTime; tone(600, t, 0.08, { vol: 0.06, slide: 1200 }); },
 };
 // suono continuo dell'attrezzo: segue quanta erba stai tagliando
@@ -1344,18 +1448,19 @@ function audioMow(dt, cutting, moving) {
   const t = AU.ctx.currentTime, tool = state.tool, on = state.screen === 'game' && !state.shop && !state.tree && !state.pause;
   const lv = on ? mowLevel : 0;
   if (state.pause) { AU.humG.gain.setTargetAtTime(0, t, 0.1); AU.mow.g.gain.setTargetAtTime(0, t, 0.08); return; }
-  const hum = tool === 'mower' ? 0.05 : tool === 'trimmer' ? 0.02 : tool === 'blower' ? 0.035 : 0;
+  const hum = tool === 'mower' ? 0.05 : tool === 'trimmer' ? 0.02 : tool === 'blower' ? 0.035 : tool === 'flame' ? 0.03 : 0;
   AU.humG.gain.setTargetAtTime(on ? (0.25 + lv) * hum : 0, t, 0.1);
-  AU.hum.frequency.setTargetAtTime(tool === 'trimmer' ? 140 + lv * 40 : tool === 'blower' ? 90 : 50 + lv * 10, t, 0.1);
-  AU.mow.f.frequency.setTargetAtTime(tool === 'trimmer' ? 2200 : tool === 'blower' ? 1200 : 420, t, 0.1);
-  AU.mow.g.gain.setTargetAtTime(lv * (tool === 'scythe' ? 0 : tool === 'blower' ? 0.06 : 0.045), t, 0.08);
-  AU.rain.g.gain.setTargetAtTime(state.event?.type === 'rain' && state.screen === 'game' ? 0.05 : 0, t, 0.4);
+  AU.hum.frequency.setTargetAtTime(tool === 'trimmer' ? 140 + lv * 40 : tool === 'blower' ? 90 : tool === 'flame' ? 38 : 50 + lv * 10, t, 0.1);
+  AU.mow.f.frequency.setTargetAtTime(tool === 'trimmer' ? 2200 : tool === 'blower' ? 1200 : tool === 'flame' ? 260 : 420, t, 0.1);
+  AU.mow.g.gain.setTargetAtTime(on ? (tool === 'flame' ? 0.05 + lv * 0.05 : lv * (tool === 'scythe' || tool === 'scissors' ? 0 : tool === 'blower' ? 0.06 : 0.045)) : 0, t, 0.08);
+  const rn = state.rain, rd = rn ? Math.hypot(state.x - rn.x, state.y - rn.y) : 1e9;
+  AU.rain.g.gain.setTargetAtTime(rn && state.screen === 'game' ? 0.012 + 0.045 * clamp(1.5 - rd / (rn.r * 2), 0, 1) : 0, t, 0.4);
   // vento che va e viene e uccellini di giorno
   AU.wind.g.gain.setTargetAtTime(0.012 + 0.012 * Math.max(0, Math.sin(state.time * 0.3)), t, 0.5);
   const season = state.screen === 'home' || state.screen === 'lobby' ? 'petals' : MAPS[mapIdx].weather;
   AU.wind.f.frequency.setTargetAtTime(season === 'leaves' ? 600 : season === 'snow' ? 300 : 380, t, 0.5);
   if (season === 'leaves' || season === 'snow') AU.wind.g.gain.setTargetAtTime(0.02 + 0.025 * Math.max(0, Math.sin(state.time * 0.4)), t, 0.5);
-  const day = state.t > 0.05 && state.t < 0.9 && state.event?.type !== 'rain' && state.screen !== 'end';
+  const day = state.t > 0.05 && state.t < 0.9 && !state.rain && state.screen !== 'end';
   if (day && (season === 'petals' || season === 'butterflies') && Math.random() < dt * (season === 'petals' ? 0.3 : 0.12)) sfx.bird();
   if (day && season === 'butterflies' && Math.random() < dt * 0.15) sfx.cicada();
   if (day && season === 'snow' && Math.random() < dt * 0.05) sfx.crow();
@@ -1392,11 +1497,16 @@ function popTransform(t0, cx, cy) {
 
 // statistiche derivate dai potenziamenti e dai bonus attivi
 const stat = {
-  radius: () => (7.5 + 1.6 * state.upg.blade) * (1 + 0.1 * sk('c1')) * (state.active.maxi ? 2 : 1),
-  speed: () => CFG.speed * TOOL[state.tool].speed * (1 + 0.08 * state.upg.speed) * (1 + 0.06 * sk('c2')) * (state.active.turbo ? 1.8 : 1),
-  value: () => CFG.coinPerCell * mapValue() * teamMult() * (1 + 0.25 * su('roots')) * (1 + 0.25 * state.upg.value) * (state.active.rain ? 3 : 1) * state.combo * stat.dayMult(),
-  regrow: () => (state.event?.type === 'rain' ? 0.25 : 1) * CFG.regrowSeconds * Math.pow(0.88, state.upg.grow) * Math.pow(0.92, sk('n1')) * Math.pow(0.9, su('fertile')),
-  goldChance: () => (0.004 + 0.006 * state.upg.gold) * (1 + 0.4 * sk('n3')) * (1 + 0.5 * su('golden')),
+  radius: () => (7.5 + 1 * state.upg.blade) * (1 + 0.1 * sk('c1')) * (state.active.maxi ? 2 : 1),
+  speed: () => CFG.speed * TOOL[state.tool].speed * (1 + 0.06 * state.upg.speed) * (1 + 0.06 * sk('c2')) * (state.active.turbo ? 1.8 : 1),
+  value: () => CFG.coinPerCell * mapValue() * teamMult() * (1 + 0.25 * su('roots')) * (1 + 0.25 * state.upg.value) * (state.active.rain ? 3 : 1) * (state.rainbow > 0 ? 2 : 1) * state.combo * stat.dayMult(),
+  goldChance: () => (0.004 + 0.006 * state.upg.gold) * (1 + 0.4 * sk('n2')) * (1 + 0.5 * su('golden')),
+  xpMult: () => (1 + 0.2 * su('wisdom')) * (1 + 0.15 * state.upg.xp),
+  // pioggia (la manda il cielo del prato): ogni quanto, quanto è grande, quanto fa crescere, quanto dura
+  rainEvery: () => (80 - 12 * mapIdx) * (1 + 0.2 * sk('r1')) * (1 + 0.1 * su('sereno')),
+  rainRadius: () => (48 + 16 * mapIdx) * (1 - 0.15 * sk('r3')),
+  rainGrow: () => (7 - mapIdx) * (1 + 0.25 * sk('r2')),   // secondi sotto la nuvola per tornare alta
+  rainDur: () => 20 * (1 - 0.35 * sk('r4')),
   puChance: () => 0.0012 * (1 + 0.6 * state.upg.luck) * (1 + 0.2 * sk('l1')),
   puDur: (type) => PU[type].dur * (1 + 0.25 * sk('l2')),
   comboMax: () => (sk('c4') ? 3 : sk('c3') ? 2 : 1),
@@ -1405,14 +1515,14 @@ const stat = {
 };
 
 // salvataggio automatico (solo nel browser di chi gioca)
-const SAVE_KEY = 'prato-salvataggio-v2';   // v2: partita nuova dalla versione 0.8 (più difficile)
+const SAVE_KEY = 'prato-salvataggio-v3';   // v3 (25/11/2026): prati da finire, pioggia, forbici e lanciafiamme: si riparte da zero
 // ep = "epoca" della partita (cambia con Nuova partita), ts = ora del salvataggio: servono a scegliere
 // il salvataggio più avanti tra i dispositivi dello stesso account (vedi syncSave/adoptRemote più sotto).
 function saveData() {
   const solo = !state.coop;
   return {
     coins: state.coins, earned: state.earned, runEarned: state.runEarned, seeds: state.seeds, seedUpg: state.seedUpg, rebirths: state.rebirths, playTime: state.playTime, ended: state.ended, vol: state.vol, help: state.help, shakeOn: state.shakeOn, upg: state.upg, skills: state.skills, tools: state.tools, tool: state.tool, map: state.map, maps: state.maps, level: state.level, xp: state.xp, points: state.points,
-    day: solo ? state.day : state.coop.myDay, t: solo ? state.t : state.coop.myT, ep: state.ep || 0, cnt: state.cnt, best: state.best, ts: Date.now(),
+    day: solo ? state.day : state.coop.myDay, t: solo ? state.t : state.coop.myT, ep: state.ep || 0, ver: 3, done: state.done, cnt: state.cnt, best: state.best, ts: Date.now(),
   };
 }
 function save() {
@@ -1431,11 +1541,13 @@ function load() {
 }
 function applySave(d) {
   // si riparte dai valori iniziali e si applica il salvataggio (serve anche per quello di un altro dispositivo)
-  state.upg = Object.fromEntries(UPG.map((u) => [u.id, 0])); state.seedUpg = {}; state.tools = { mower: 1 }; state.tool = 'mower';
+  state.upg = Object.fromEntries(UPG.map((u) => [u.id, 0])); state.seedUpg = {}; state.tools = { scissors: 1 }; state.tool = 'scissors'; state.done = {};
   state.maps = { garden: 1 }; state.map = 0; state.skills = {}; state.active = {}; state.combo = 1;
   state.ep = +d.ep || 0;
   state.cnt = Object.assign({ cells: 0, gold: 0, mole: 0, weed: 0, dog: 0 }, d.cnt || {});
   state.best = Object.assign({ rate: 0 }, d.best || {});
+  state.done = {}; for (const m of MAPS) if (d.done && d.done[m.id]) state.done[m.id] = 1;
+  if (d.lawns && typeof d.lawns === 'object') { lawnStore = d.lawns; try { localStorage.setItem(LAWN_KEY, JSON.stringify(lawnStore)); } catch (e) { } }
   {
     state.coins = d.coins || 0; state.level = d.level || 1; state.xp = d.xp || 0; state.points = d.points || 0;
     state.day = d.day || 1; state.t = d.t ?? 0.08;
@@ -1466,7 +1578,7 @@ const MOWER_OFF = { up: [0, -15], down: [0, 8], left: [-11, -2], right: [11, -2]
 
 function buy(u) {
   const lv = state.upg[u.id];
-  if (lv >= u.max) return;
+  if (lv >= upgMax(u)) { sfx.deny(); return; }
   const cost = upgCost(u);
   if (state.coins < cost) { sfx.deny(); return; }
   sfx.buy();
@@ -1476,12 +1588,13 @@ function buy(u) {
   save();
 }
 
+let cutMark = 0;   // 1 mentre taglia il lanciafiamme (l'erba resta bruciata)
 function cutCircle(mx, my, R, s, mult = 1, filt = null) {
   const i0 = Math.floor((mx - R - LAWN0) / C), i1 = Math.floor((mx + R - LAWN0) / C);
   const j0 = Math.floor((my - R - LAWN0) / C), j1 = Math.floor((my + R - LAWN0) / C);
   let gained = 0, xpGain = 0, tall = 0;
   const value = stat.value() * mult;
-  const tallMult = 1 + 0.15 * sk('n2'), goldMult = sk('n4') ? 15 : 10, lucky = 0.02 * sk('l3');
+  const tallMult = 1 + 0.15 * sk('n1'), goldMult = sk('n4') ? 15 : 10, lucky = 0.02 * sk('l3');
   for (let j = Math.max(0, j0); j <= Math.min(N - 1, j1); j++) {
     for (let i = Math.max(0, i0); i <= Math.min(N - 1, i1); i++) {
       const cx = LAWN0 + i * C + C / 2, cy = LAWN0 + j * C + C / 2;
@@ -1509,7 +1622,7 @@ function cutCircle(mx, my, R, s, mult = 1, filt = null) {
           for (let q = 0; q < n; q++) spawnClip(cx, cy);
         }
         gained += v;
-        xpGain += g;
+        xpGain += g * Math.sqrt(MAPS[mapIdx].value);
         state.cnt.cells++; if (sess.t0) sess.cells++;
         // bonus nascosto nell'erba alta
         if (g > 0.85 && Math.random() < stat.puChance() && pickups.length < 4) {
@@ -1518,7 +1631,7 @@ function cutCircle(mx, my, R, s, mult = 1, filt = null) {
         }
       }
       grow[idx] = 0;
-      if (g > 0.02) { cutN[idx] = (cutN[idx] + 1) & 255; coopCut(idx); }
+      if (g > 0.02) { cutN[idx] = (cutN[idx] + 1) & 255; coopCut(idx); if (cutMark) burnt[idx] = 255; }
       if (s) stripe[idx] = s;
     }
   }
@@ -1581,6 +1694,22 @@ function update(dt) {
   const R = stat.radius(), [dvx, dvy] = DIRV[state.dir];
   let res = { gained: 0, xpGain: 0, tall: 0 };
   if (frozen) { /* fermo nei menu */ }
+  else if (state.tool === 'scissors') {
+    // forbici: un ciuffo davanti ai piedi, un colpo alla volta
+    res = cutCircle(state.x + dvx * 6, state.y - 3 + dvy * 5, R * 0.55, 0);
+    state.snipT -= dt;
+    if (res.gained > 0 && state.snipT <= 0) { state.snipT = 0.22; sfx.snip(); }
+  }
+  else if (state.tool === 'flame') {
+    // lanciafiamme: brucia un cerchio largo davanti, a distanza
+    cutMark = 1;
+    res = cutCircle(state.x + dvx * 26, state.y - 4 + dvy * 22, R * 1.6 + 5, 0);
+    cutMark = 0;
+    for (let q = 0; q < 3; q++) {
+      const a = Math.atan2(dvy, dvx) + (Math.random() - 0.5) * 0.7, sp = 90 + Math.random() * 70;
+      if (particles.length < 900) particles.push({ x: state.x + dvx * 10, y: state.y - 5 + dvy * 8, z: 4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: 10, t: 0, life: 0.28 + Math.random() * 0.2, col: ['#ffd23f', '#ff9a3c', '#e2453c', '#fff2a3'][(Math.random() * 4) | 0], fire: 1 });
+    }
+  }
   else if (state.tool === 'mower') res = cutCircle(mx, my, R, 0);
   else if (state.tool === 'trimmer') { state.spin += dt * 30; res = cutCircle(state.x, state.y - 3, R * 0.8 + 4, 0); }
   else if (state.tool === 'scythe') {
@@ -1590,7 +1719,7 @@ function update(dt) {
       res = cutCircle(state.x, state.y - 3, R * 2.4 + 6, 0, 1.5, (dx, dy) => dx * dvx + dy * dvy > -2);
     }
   } else if (state.tool === 'blower' && !frozen) {
-    res = cutCircle(state.x + dvx * 20, state.y - 3 + dvy * 20, R * 1.1, 0);
+    res = cutCircle(state.x + dvx * 20, state.y - 3 + dvy * 20, R * 1.3, 0);
     // attira i bonus e taglia da solo i ciuffi d'oro vicini
     for (const p of pickups) { const dx = state.x - p.x, dy = state.y - 4 - p.y, d = Math.hypot(dx, dy); if (d < 100 && d > 1) { p.x += dx / d * 90 * dt; p.y += dy / d * 90 * dt; } }
     if (Math.random() < 0.5) particles.push({ x: state.x + dvx * 14, y: state.y - 3 + dvy * 14, z: 2, vx: dvx * 80 + (Math.random() - 0.5) * 30, vy: dvy * 80 + (Math.random() - 0.5) * 30, vz: 0, t: 0, life: 0.35, col: 'rgba(255,255,255,0.7)' });
@@ -1637,7 +1766,7 @@ function update(dt) {
 
   // --- esperienza e livelli
   if (xpGain > 0) {
-    state.xp += xpGain * (1 + 0.2 * su('wisdom'));
+    state.xp += xpGain * stat.xpMult();
     while (state.xp >= xpNeed(state.level)) {
       state.xp -= xpNeed(state.level);
       state.level++;
@@ -1676,30 +1805,22 @@ function update(dt) {
     if (state.active[key] <= 0) delete state.active[key];
   }
 
-  // --- ricrescita (con qualche ciuffo che rinasce d'oro)
-  // insieme: crescita e ciuffi d'oro li decide la regia (uguali per tutti)
+  // --- l'erba non ricresce da sola: solo la pioggia la fa ricrescere (con qualche ciuffo d'oro)
   const guest = coopGuest();
-  const step = dt / (guest ? state.coop.rg : stat.regrow());
-  const gc = guest ? state.coop.gc : stat.goldChance();
-  cutCount = 0;
-  let cutt = 0;
-  for (let q = 0; q < grow.length; q++) {
-    const v = grow[q];
-    if (v < 0) continue;
-    cutt++;
-    if (v < 1) {
-      const nv = Math.min(1, v + step);
-      grow[q] = nv;
-      if (nv > 0.85) stripe[q] = 0;
-      if (nv === 1 && v < 1 && hash01(q, cutN[q]) < gc) gold[q] = 1;
-    }
-    if (v < 0.35) cutCount++;
+  updateRain(dt, guest);
+  countLawn();
+  burnT += dt;
+  if (burnT > 0.25) { burnT = 0; for (let q = 0; q < burnt.length; q++) if (burnt[q]) burnt[q] = Math.max(0, burnt[q] - 3); }
+  if (state.rainbow > 0) state.rainbow -= dt;
+  // prato finito al 100%: si sblocca il prossimo
+  const full = cutCount >= cuttable;
+  if (full && !state.full && lawnMine()) lawnDone();
+  state.full = full;
+  if (state.travelSoon > 0) {
+    state.travelSoon -= dt;
+    if (state.travelSoon <= 0 && state.screen === 'game' && !state.pause && MAPS[mapIdx + 1] && state.maps[MAPS[mapIdx + 1].id] && lawnMine()) travel(mapIdx + 1);
   }
-  cuttable = Math.max(1, cutt);
-  // fine gioco: Fattoria tagliata quasi tutta (95%)
-  if (mapIdx === MAPS.length - 1 && !state.ended && state.maps[MAPS[mapIdx].id] && cutCount / cuttable >= 0.95) {
-    state.ended = true; state.screen = 'end'; state.screenT = 0; sfx.fanfare(); save();
-  }
+  findLeft(dt);
 
   updateParticles(dt);
   updateWeather(dt);
@@ -1723,7 +1844,96 @@ function update(dt) {
   cam.y = clamp(cam.y, VH / 2, WORLD - VH / 2);
 
   saveTimer += dt;
-  if (saveTimer > 5) { saveTimer = 0; save(); syncSave(false); }
+  if (saveTimer > 5) { saveTimer = 0; save(); storeLawn(); syncSave(false); }
+}
+let burnT = 0;
+// prato finito: festa, prossimo prato sbloccato e partenza dopo qualche secondo
+function lawnDone() {
+  const m = MAPS[mapIdx], next = MAPS[mapIdx + 1];
+  storeLawn();
+  if (state.done[m.id]) { popups.push({ x: state.x, y: state.y - 30, t: 0, text: 'DI NUOVO PERFETTO!', col: '#9dff7a', scale: 1 }); sfx.level(); return; }
+  state.done[m.id] = 1; bump('lawns');
+  for (let q = 0; q < 6; q++) firework();
+  if (next) {
+    state.maps[next.id] = 1;
+    state.banner = { text: 'PRATO FINITO!', sub: 'SBLOCCATO: ' + next.name, t: 0 };
+    sfx.fanfare();
+    state.travelSoon = 4.5;
+  } else {
+    state.ended = true; state.screen = 'end'; state.screenT = 0; sfx.fanfare();
+  }
+  save(); syncSave(true);
+}
+// aiuto per gli ultimi ciuffi: quando ne restano pochi, si vedono dove sono
+const left = { list: [], t: 0, on: false };
+function leftLimit() { return Math.max(15, Math.round(cuttable * (sk('n3') ? 0.05 : 0.02))); }
+function findLeft(dt) {
+  left.t -= dt;
+  if (left.t > 0) return;
+  left.t = 0.5;
+  const rem = cuttable - cutCount;
+  left.on = rem > 0 && rem <= leftLimit();
+  left.list = [];
+  if (!left.on) return;
+  for (let q = 0; q < grow.length && left.list.length < 600; q++) if (grow[q] >= 0.35) left.list.push(q);
+}
+// ---------------- pioggia: una nuvola passa sul prato e l'erba sotto ricresce ----------------
+function startRain() {
+  const r = stat.rainRadius();
+  // va dove c'è più erba tagliata (se no non farebbe niente)
+  let best = null, bs = -1;
+  for (let k = 0; k < 10; k++) {
+    const x = LAWN0 + r * 0.5 + Math.random() * (N * C - r), y = LAWN0 + r * 0.5 + Math.random() * (N * C - r);
+    let sc = 0;
+    for (let dy = -r; dy <= r; dy += 16) for (let dx = -r; dx <= r; dx += 16) {
+      const i = Math.floor((x + dx - LAWN0) / C), j = Math.floor((y + dy - LAWN0) / C);
+      if (i >= 0 && j >= 0 && i < N && j < N) { const g = grow[j * N + i]; if (g >= 0 && g < 0.35) sc++; }
+    }
+    if (sc > bs) { bs = sc; best = [x, y]; }
+  }
+  const a = Math.random() * Math.PI * 2, sp = 10 + Math.random() * 6;
+  state.rain = { id: rid(6), x: best[0], y: best[1], r, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: 0, dur: stat.rainDur(), gt: stat.rainGrow() };
+  state.banner = { text: 'PIOGGIA!', sub: "L'ERBA RICRESCE SOTTO LA NUVOLA", t: 0 };
+  sfx.event();
+}
+function updateRain(dt, guest) {
+  let rn = state.rain;
+  if (!rn) {
+    if (guest) return;
+    state.rainT -= dt;
+    if (state.rainT <= 0 && state.screen === 'game') startRain();
+    return;
+  }
+  rn.t += dt;
+  if (guest && rn.tx !== undefined) { rn.x += (rn.tx - rn.x) * Math.min(1, dt * 4); rn.y += (rn.ty - rn.y) * Math.min(1, dt * 4); }
+  else { rn.x += rn.vx * dt; rn.y += rn.vy * dt; }
+  if (rn.x < LAWN0 || rn.x > LAWN1) rn.vx = -rn.vx;
+  if (rn.y < LAWN0 || rn.y > LAWN1) rn.vy = -rn.vy;
+  if (rn.t >= rn.dur) {
+    if (guest) return;
+    state.rain = null;
+    state.rainT = stat.rainEvery() * (0.8 + Math.random() * 0.4);
+    bump('rains');
+    if (sk('r5')) { state.rainbow = 30; popups.push({ x: state.x, y: state.y - 30, t: 0, text: 'ARCOBALENO! X2', col: '#7fc8ff', scale: 1 }); }
+    return;
+  }
+  // l'erba sotto la nuvola cresce (più piano ai bordi, all'inizio e alla fine)
+  const k = Math.min(1, rn.t / 2, (rn.dur - rn.t) / 2);
+  const step = dt / rn.gt * k;
+  const gc = guest ? state.coop.gc : stat.goldChance();
+  const i0 = Math.max(0, Math.floor((rn.x - rn.r - LAWN0) / C)), i1 = Math.min(N - 1, Math.floor((rn.x + rn.r - LAWN0) / C));
+  const j0 = Math.max(0, Math.floor((rn.y - rn.r - LAWN0) / C)), j1 = Math.min(N - 1, Math.floor((rn.y + rn.r - LAWN0) / C));
+  const r2 = rn.r * rn.r;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const q = j * N + i, v = grow[q];
+    if (v < 0 || v >= 1) continue;
+    const dx = LAWN0 + i * C + 4 - rn.x, dy = LAWN0 + j * C + 4 - rn.y, d2 = dx * dx + dy * dy;
+    if (d2 > r2) continue;
+    const nv = Math.min(1, v + step * (1 - 0.5 * d2 / r2));
+    grow[q] = nv;
+    if (nv > 0.85) stripe[q] = 0;
+    if (nv === 1 && hash01(q, cutN[q]) < gc) gold[q] = 1;
+  }
 }
 // numero "a caso" ma uguale su tutti i dispositivi: decide quali ciuffi rinascono d'oro
 function hash01(a, b) {
@@ -1821,6 +2031,7 @@ function draw() {
         if (gv < 0) { vg.drawImage(gv < -1.5 ? sandTile : sprites.cut[0][v], x, y - 4); continue; }
         if (gv < 0.3) {
           vg.drawImage(sprites.cut[0][v], x, y - 4);
+          if (burnt[k]) { vg.fillStyle = `rgba(40,22,18,${(burnt[k] / 255 * 0.75).toFixed(2)})`; vg.fillRect(x, y, C, C); }
           // ombra dell'erba alta sopra: dà profondità al bordo del taglio
           if (j > 0 && grow[k - N] >= 0.55) { vg.fillStyle = P.cutShadow; vg.fillRect(x, y, C, 2); }
         } else if (gv < 0.55) {
@@ -1916,9 +2127,14 @@ function draw() {
   for (const p of particles) {
     if (p.ui) continue;
     vg.fillStyle = p.col;
+    if (p.fire) { const sz = p.t < 0.15 ? 2 : 3; vg.fillRect(Math.round(p.x), Math.round(p.y - p.z), sz, sz); continue; }
     vg.fillRect(Math.round(p.x), Math.round(p.y - p.z), 2, 1);
     vg.fillRect(Math.round(p.x) + (p.t * 9 % 2 | 0), Math.round(p.y - p.z) - 1, 1, 1);
   }
+
+  drawLeft(t);
+  drawRainWorld(t);
+  drawCloud(t);
 
   // --- ombre delle nuvole che passano
   vg.fillStyle = 'rgba(20,10,60,0.10)';
@@ -1977,40 +2193,51 @@ function ellipse(x, y, rx, ry) {
   vg.fill();
 }
 // attrezzi disegnati a mano, pixel per pixel
-function drawTool(a) {
-  const [dx, dy] = DIRV[a.dir];
-  const hx = Math.round(a.x + dx * 4), hy = Math.round(a.y - 7 + dy * 2);
-  const R = a.R;
-  if (a.tool === 'trimmer') {
+function drawTool(ac) {
+  const [dx, dy] = DIRV[ac.dir];
+  const hx = Math.round(ac.x + dx * 4), hy = Math.round(ac.y - 7 + dy * 2);
+  const R = ac.R;
+  if (ac.tool === 'scissors') {
+    // forbici in mano, che si aprono e chiudono
+    const tx = ac.x + dx * 9, ty = ac.y - 4 + dy * 7;
+    const base = Math.atan2(ty - hy, tx - hx), op = ac.moving ? Math.abs(Math.sin(state.time * 14)) * 0.5 : 0.25;
+    for (const sg of [-1, 1]) {
+      const ex = hx + Math.cos(base + sg * op) * 8, ey = hy + Math.sin(base + sg * op) * 8;
+      line(hx, hy, ex, ey, P.ink, 3); line(hx, hy, ex, ey, P.metal, 1);
+    }
+    px(vg, hx - 2, hy - 1, P.ink, 4, 4); px(vg, hx - 1, hy, P.red, 2, 2);
+  } else if (ac.tool === 'trimmer') {
     // asta verso il basso davanti e filo che gira: anello di puntini sul raggio di taglio
-    const tx = Math.round(a.x + dx * 9), ty = Math.round(a.y + 1 + dy * 6);
+    const tx = Math.round(ac.x + dx * 9), ty = Math.round(ac.y + 1 + dy * 6);
     line(hx, hy, tx, ty, P.ink, 3); line(hx, hy, tx, ty, P.red, 1);
     px(vg, tx - 2, ty - 1, P.ink, 5, 3); px(vg, tx - 1, ty - 1, P.metal, 3, 2);
     const rr = R * 0.8 + 4;
     for (let q = 0; q < 3; q++) {
-      const a = a.spin + q * 2.09;
-      line(a.x, a.y - 3, a.x + Math.cos(a) * rr, a.y - 3 + Math.sin(a) * rr * 0.9, 'rgba(240,255,210,0.85)', 1);
+      const an = ac.spin + q * 2.09;
+      line(ac.x, ac.y - 3, ac.x + Math.cos(an) * rr, ac.y - 3 + Math.sin(an) * rr * 0.9, 'rgba(240,255,210,0.85)', 1);
     }
-  } else if (a.tool === 'scythe') {
+  } else if (ac.tool === 'scythe') {
     // manico lungo e lama curva; durante il colpo la lama spazza un arco
-    const k = a.swing > 0 ? 1 - a.swing / 0.22 : 0;
+    const k = ac.swing > 0 ? 1 - ac.swing / 0.22 : 0;
     const base = Math.atan2(dy, dx);
-    const a = a.swing > 0 ? base - 1.6 + k * 3.2 : base + 1.1;
-    const len = a.swing > 0 ? R * 2.4 + 6 : 12;
-    const ex = a.x + Math.cos(a) * len, ey = a.y - 4 + Math.sin(a) * len * 0.9;
+    const an = ac.swing > 0 ? base - 1.6 + k * 3.2 : base + 1.1;
+    const len = ac.swing > 0 ? R * 2.4 + 6 : 12;
+    const ex = ac.x + Math.cos(an) * len, ey = ac.y - 4 + Math.sin(an) * len * 0.9;
     line(hx, hy, ex, ey, P.ink, 3); line(hx, hy, ex, ey, P.trunk, 1);
-    const bx = ex + Math.cos(a + 1.57) * 5, by = ey + Math.sin(a + 1.57) * 5;
+    const bx = ex + Math.cos(an + 1.57) * 5, by = ey + Math.sin(an + 1.57) * 5;
     line(ex, ey, bx, by, P.ink, 3); line(ex, ey, bx, by, P.white, 1);
-    if (a.swing > 0) for (let q = 0; q < 10; q++) {
+    if (ac.swing > 0) for (let q = 0; q < 10; q++) {
       const aa = base - 1.6 + k * 3.2 * (q / 10);
-      px(vg, Math.round(a.x + Math.cos(aa) * len), Math.round(a.y - 4 + Math.sin(aa) * len * 0.9), 'rgba(255,255,255,0.6)', 2, 1);
+      px(vg, Math.round(ac.x + Math.cos(aa) * len), Math.round(ac.y - 4 + Math.sin(aa) * len * 0.9), 'rgba(255,255,255,0.6)', 2, 1);
     }
-  } else if (a.tool === 'blower') {
-    // zaino sulla schiena e bocchetta in avanti
-    const bx = Math.round(a.x - dx * 5 - 3), by = Math.round(a.y - 13 - dy * 2);
-    if (a.dir !== 'down') { px(vg, bx - 1, by - 1, P.ink, 8, 9); px(vg, bx, by, '#ffb347', 6, 7); px(vg, bx, by, '#ffd27a', 6, 2); }
-    const nx = Math.round(a.x + dx * 13), ny = Math.round(a.y - 4 + dy * 10);
-    line(hx, hy, nx, ny, P.ink, 4); line(hx, hy, nx, ny, '#7a7499', 2);
+  } else if (ac.tool === 'blower' || ac.tool === 'flame') {
+    // zaino sulla schiena e bocchetta in avanti (il lanciafiamme ha la bombola rossa e la fiammella)
+    const fl = ac.tool === 'flame';
+    const bx = Math.round(ac.x - dx * 5 - 3), by = Math.round(ac.y - 13 - dy * 2);
+    if (ac.dir !== 'down') { px(vg, bx - 1, by - 1, P.ink, 8, 9); px(vg, bx, by, fl ? P.red : '#ffb347', 6, 7); px(vg, bx, by, fl ? P.redHi : '#ffd27a', 6, 2); }
+    const nx = Math.round(ac.x + dx * 13), ny = Math.round(ac.y - 4 + dy * 10);
+    line(hx, hy, nx, ny, P.ink, 4); line(hx, hy, nx, ny, fl ? '#4b4660' : '#7a7499', 2);
+    if (fl) { const f = Math.sin(state.time * 30) > 0; px(vg, nx - 1 + dx * 2, ny - 1 + dy * 2, f ? P.gold : '#ff9a3c', 3, 3); }
   }
 }
 function drawHandle(a, mx, my) {
@@ -2032,6 +2259,12 @@ function line(x0, y0, x1, y1, col, w) {
 // ---------------- icone pixel (10x10) ----------------
 const ICON_PAL = { k: P.ink, y: P.gold, Y: P.goldHi, o: P.goldLo, w: P.white, g: '#a9a7c2', r: P.red, b: '#4aa8ff', B: '#2a6fd0', G: '#4cc35a', D: '#2f8f3f' };
 const ICON_MAPS = {
+  scissors: ['.k.....k..', 'kwk...kwk.', '.kwk.kwk..', '..kwkwk...', '...kgk....', '..krkrk...', '.krk.krk..', 'kr.k.k.rk.', 'kr.k.k.rk.', '.kk...kk..'],
+  torch: ['......yo..', '.....yYyo.', '....kyYYo.', 'kkkkkkyo..', 'kgggggk...', 'kgkkkgk...', 'kgk.krrk..', 'kk..krrk..', '....krrk..', '....kkkk..'],
+  book: ['.kkkkkkkk.', 'kbbbbbbbwk', 'kbwwwwwbwk', 'kbbbbbbbwk', 'kbwwwbbbwk', 'kbbbbbbbwk', 'kbbbbbbbwk', 'kBBBBBBBwk', 'kwwwwwwwwk', '.kkkkkkkk.'],
+  eye: ['..........', '...kkkk...', '.kkwwwwkk.', 'kwwwGGwwwk', 'kwwGDDGwwk', 'kwwGDDGwwk', 'kwwwGGwwwk', '.kkwwwwkk.', '...kkkk...', '..........'],
+  cloud: ['..........', '...kkk....', '..kwwwk...', '.kwwwwwkk.', 'kwwwwwwwwk', 'kwwwwwwwwk', '.kkkkkkkk.', '..b..b..b.', '.b..b..b..', '..........'],
+  rainbow: ['..........', '..kkkkkk..', '.krrrrrrk.', 'kryyyyyyrk', 'kryGGGGyrk', 'kryGbbGyrk', 'kryGb.bGyr', 'kryG..Gyrk', 'kky....ykk', '..........'],
   bolt: ['....kkkk..', '...kYyyk..', '..kYyyk...', '.kYyyykkk.', 'kyyyyyyyk.', 'kkkkyyyk..', '...kyyk...', '..kyyk....', '.kyk......', '.kk.......'],
   blade: ['........kk', '.......kwk', '......kwgk', '.....kwgk.', '....kwgk..', '...kwgk...', 'kk.kgk....', 'krkkk.....', 'krrk......', '.kk.......'],
   drop: ['....kk....', '...kbbk...', '...kbbk...', '..kbwbbk..', '..kbwbbk..', '.kbbbbbbk.', '.kbbbbbbk.', '.kbbbbBbk.', '..kbbBbk..', '...kkkk...'],
@@ -2101,7 +2334,7 @@ function textRow(str, x, y, h, color, scale = 1, align = 'left') {
   return text(str, x, y + Math.floor((h - textH(scale)) / 2), color, scale, align);
 }
 function panel(x, y, w, h, tone = 'purple') {
-  const [lo, mid, hi] = tone === 'green' ? ['#1f7a3a', '#2fa34b', '#58cf6b'] : tone === 'gray' ? ['#4a4566', '#615b80', '#7a7499'] : tone === 'dark' ? ['#2a1a55', '#3a2470', '#4c3290'] : tone === 'red' ? ['#8a2230', '#c8383f', '#ef6a5e'] : tone === 'gold' ? ['#9a5a12', '#d99a22', '#ffd257'] : [P.panelLo, P.panel, P.panelHi];
+  const [lo, mid, hi] = tone === 'green' ? ['#1f7a3a', '#2fa34b', '#58cf6b'] : tone === 'gray' ? ['#4a4566', '#615b80', '#7a7499'] : tone === 'dark' ? ['#2a1a55', '#3a2470', '#4c3290'] : tone === 'red' ? ['#8a2230', '#c8383f', '#ef6a5e'] : tone === 'gold' ? ['#9a5a12', '#d99a22', '#ffd257'] : tone === 'blue' ? ['#1f4f8a', '#2f78c8', '#5aa8f0'] : [P.panelLo, P.panel, P.panelHi];
   px(vg, x + 1, y + h, 'rgba(20,10,50,0.45)', w, 2);              // ombra
   px(vg, x + 1, y, P.ink, w - 2, h); px(vg, x, y + 1, P.ink, w, h - 2);
   px(vg, x + 1, y + 1, lo, w - 2, h - 2);
@@ -2176,6 +2409,11 @@ function drawHUD() {
     let y = 44 + Object.keys(state.active).length * 18;
     const chips = [];
     if (state.event) { const E = EVENTS[state.event.type]; chips.push(['star', E.chip + ' ' + Math.ceil(state.event.dur - state.event.t) + 'S', E.tone]); }
+    if (state.rain) chips.push(['cloud', 'PIOGGIA ' + Math.max(0, Math.ceil(state.rain.dur - state.rain.t)) + 'S', 'blue']);
+    else if (state.rainT < 10 && !coopGuest() && state.rainT > 0) chips.push(['cloud', 'PIOGGIA TRA ' + Math.ceil(state.rainT) + 'S', 'dark']);
+    if (state.rainbow > 0) chips.push(['rainbow', 'ARCOBALENO X2 ' + Math.ceil(state.rainbow) + 'S', 'blue']);
+    if (left.on) chips.push(['eye', (cuttable - cutCount === 1 ? 'MANCA 1 CIUFFO' : 'MANCANO ' + (cuttable - cutCount) + ' CIUFFI'), 'gold']);
+    if (state.travelSoon > 0) chips.push(['flag', 'SI PARTE TRA ' + Math.ceil(state.travelSoon) + 'S', 'green']);
     if (state.combo > 1.05) chips.push(['flame', 'COMBO X' + state.combo.toFixed(1).replace('.', ','), 'red']);
     if (state.coop && othersAlive()) chips.push(['clover', 'SQUADRA +' + Math.round((teamMult() - 1) * 100) + '%', 'green']);
     if (state.coop && mapValue() < MAPS[mapIdx].value) chips.push(['coin', 'ERBA X' + mapValue() + ' (IL TUO PRATO MIGLIORE)', 'dark']);
@@ -2192,7 +2430,7 @@ function drawHUD() {
   // --- giornata (in alto a destra)
   {
     const phase = phaseLabel(state.t), day = 'GIORNO ' + state.day;
-    const prato = MAPS[mapIdx].name + ' ' + Math.round(cutCount / cuttable * 100) + '%';
+    const prato = MAPS[mapIdx].name + ' ' + Math.floor(cutCount / cuttable * 100) + '%';
     const w = Math.max(textW(phase) + 8 + textW(day), textW(prato), 90) + PAD * 2;
     const x0 = VW - w - 4;
     panel(x0, 4, w, 38);
@@ -2206,10 +2444,25 @@ function drawHUD() {
     px(vg, sxp - 1, by - 1, P.ink, 5, 7); px(vg, sxp, by, P.gold, 3, 5); px(vg, sxp, by, P.goldHi, 1, 1);
     textRow(prato, x0 + PAD, 25, 15, '#c8ffb0');
   }
+  // --- freccia verso l'erba rimasta più vicina, se non si vede
+  if (left.on && left.list.length && !state.shop && !state.tree) {
+    let best = null, bd = 1e18;
+    for (const q of left.list) { const x = LAWN0 + (q % N) * C + 4, y = LAWN0 + ((q / N) | 0) * C + 4, d = (x - state.x) ** 2 + (y - state.y) ** 2; if (d < bd) { bd = d; best = [x, y]; } }
+    const sx = (best[0] - cam.x) * WS / US + VW / 2, sy = (best[1] - cam.y) * WS / US + VH / 2;
+    if (sx < 8 || sx > VW - 8 || sy < 8 || sy > VH - 8) {
+      const cx = VW / 2, cy = VH / 2, an = Math.atan2(sy - cy, sx - cx);
+      const k = Math.min((VW / 2 - 26) / Math.max(1e-3, Math.abs(Math.cos(an))), (VH / 2 - 26) / Math.max(1e-3, Math.abs(Math.sin(an))));
+      const ax = cx + Math.cos(an) * k, ay = cy + Math.sin(an) * k, bob = Math.sin(state.time * 8) * 2;
+      const tip = [ax + Math.cos(an) * (8 + bob), ay + Math.sin(an) * (8 + bob)];
+      const l = [ax + Math.cos(an + 2.5) * 7, ay + Math.sin(an + 2.5) * 7], r = [ax + Math.cos(an - 2.5) * 7, ay + Math.sin(an - 2.5) * 7];
+      vg.fillStyle = P.ink; vg.beginPath(); vg.moveTo(tip[0] + Math.cos(an) * 2, tip[1] + Math.sin(an) * 2); vg.lineTo(l[0] + Math.cos(an + 2.5) * 2, l[1] + Math.sin(an + 2.5) * 2); vg.lineTo(r[0] + Math.cos(an - 2.5) * 2, r[1] + Math.sin(an - 2.5) * 2); vg.fill();
+      vg.fillStyle = P.goldHi; vg.beginPath(); vg.moveTo(tip[0], tip[1]); vg.lineTo(l[0], l[1]); vg.lineTo(r[0], r[1]); vg.fill();
+    }
+  }
   // --- pulsante del negozio (in basso a destra)
   {
     const label = IS_TOUCH ? 'NEGOZIO' : 'NEGOZIO [E]';
-    const canBuy = UPG.some((u) => state.upg[u.id] < u.max && state.coins >= upgCost(u));
+    const canBuy = UPG.some((u) => state.upg[u.id] < upgMax(u) && state.coins >= upgCost(u));
     const w = PAD + 10 + 4 + textW(label) + PAD, h = 17;
     const x0 = VW - w - 4, y0 = VH - h - 4;
     const hov = inside(x0, y0, w, h);
@@ -2316,7 +2569,7 @@ let treeSel = null;   // telefono: primo tocco legge il nodo, il secondo lo impa
 function drawTree() {
   vg.fillStyle = 'rgba(20,10,50,0.6)';
   vg.fillRect(0, 0, VW, VH);
-  const PAD = 6, w = 330, h = 272;
+  const PAD = 6, w = 346, h = 272;
   const x0 = Math.round(VW / 2 - w / 2), y0 = Math.max(2, Math.round(VH / 2 - h / 2));
   popTransform(state.uiT, x0 + w / 2, y0 + h / 2);
   panel(x0, y0, w, h);
@@ -2335,9 +2588,9 @@ function drawTree() {
   const ax = x0 + PAD, ay = y0 + 62, aw = w - PAD * 2, ah = h - 62 - PAD;
   panel(ax, ay, aw, ah, 'dark');
   const NS = 22;                                          // lato di un nodo
-  const colX = { cut: ax + aw * 0.18, nat: ax + aw * 0.5, luck: ax + aw * 0.82 };
+  const colX = { cut: ax + aw * 0.125, nat: ax + aw * 0.375, sky: ax + aw * 0.625, luck: ax + aw * 0.875 };
   const rowY = [ay + ah - 52, ay + ah - 88, ay + ah - 124, ay + 40];
-  const pos = (k) => [Math.round(colX[k.br] + k.gx * 30), Math.round(rowY[k.gy])];
+  const pos = (k) => [Math.round(colX[k.br] + k.gx * 23), Math.round(rowY[k.gy])];
   const root = [Math.round(ax + aw / 2), ay + ah - 16];
   const owned = (k) => sk(k.id) > 0;
 
@@ -2421,7 +2674,7 @@ function drawShop() {
   vg.fillRect(0, 0, VW, VH);
   const rowH = 30, gap = 3, PAD = 6;
   const TABS = [['upg', 'POTENZIAMENTI'], ['tools', 'ATTREZZI']];
-  const seedTab = state.rebirths > 0 || state.runEarned >= REBIRTH_MIN * 0.3;
+  const seedTab = state.rebirths > 0 || !!state.done.garden;
   TABS.push(['maps', 'PRATI']);
   if (seedTab) TABS.push(['seeds', 'SEMI']);
   if (state.shopTab === 'seeds' && !seedTab) state.shopTab = 'upg';
@@ -2484,9 +2737,9 @@ function drawShop() {
     });
   } else if (state.shopTab === 'seeds') {
     // prima riga: la rinascita
-    const gain = seedsFor(state.runEarned), sure = state.time - state.confirmRebirth < 3;
+    const gain = seedsNow(), sure = state.time - state.confirmRebirth < 3;
     if (state.coop) row(0, 'seed', 'RINASCI', 'SI PUO RINASCERE SOLO GIOCANDO DA SOLO', 'SEMI: ' + state.seeds, { label: 'DA SOLO' }, 'gray', () => sfx.deny());
-    else row(0, 'seed', 'RINASCI', gain ? 'TORNI AL GIARDINO A ZERO: +' + gain + ' SEMI' : 'SERVONO ' + fmt(REBIRTH_MIN) + ' MONETE IN QUESTO GIRO',
+    else row(0, 'seed', 'RINASCI', gain ? 'TORNI AL GIARDINO A ZERO: +' + gain + ' SEMI' : 'FINISCI IL GIARDINO PER POTER RINASCERE',
       'SEMI: ' + state.seeds, { label: gain ? (sure ? 'SICURO?' : 'RINASCI') : 'NON ANCORA' }, gain ? (sure ? 'red' : 'gold') : 'gray',
       () => { if (!gain) return; if (sure) rebirth(); else state.confirmRebirth = state.time; });
     SEEDS.forEach((u, i) => {
@@ -2498,9 +2751,9 @@ function drawShop() {
     drawMapRows(row);
   } else {
     UPG.forEach((u, i) => {
-      const lv = state.upg[u.id], maxed = lv >= u.max, cost = upgCost(u);
+      const lv = state.upg[u.id], maxed = lv >= u.max, capped = !maxed && lv >= upgMax(u), cost = upgCost(u);
       row(i, u.icon, u.name, u.desc, 'LV ' + lv + '/' + u.max,
-        maxed ? { label: 'MAX' } : { cost }, maxed ? 'gray' : state.coins >= cost ? 'green' : 'gray', () => buy(u));
+        maxed ? { label: 'MAX' } : capped ? { label: 'PRATO DOPO' } : { cost }, maxed || capped ? 'gray' : state.coins >= cost ? 'green' : 'gray', () => buy(u));
     });
   }
 }
@@ -2720,9 +2973,10 @@ function syncSave(force) {
   if (!force && (!svDirty || Date.now() - lastSync < 120000)) return;
   if (!hasProgress()) return;
   lastSync = Date.now(); svDirty = false;
-  const mine = saveData();
-  // tolgo i miei salvataggi vecchi (e quelli meno avanti); tengo quelli più avanti di un altro dispositivo
-  const recs = readRecs().filter((r) => !r.sv || cmpProg(progress(r.sv), progress(mine)) > 0);
+  storeLawn();
+  const mine = Object.assign(saveData(), { lawns: lawnStore });
+  // tolgo i miei salvataggi vecchi (e quelli meno avanti o delle versioni vecchie); tengo quelli più avanti di un altro dispositivo
+  const recs = readRecs().filter((r) => !r.sv || (r.sv.ver === 3 && cmpProg(progress(r.sv), progress(mine)) > 0));
   recs.push({ k: 'sv-' + Date.now().toString(36) + rid(4), t: Date.now(), st: true, name: myName || 'Giocatore', sv: mine });
   writeRecs(recs);
 }
@@ -2731,12 +2985,12 @@ function adoptRemote() {
   if (state.screen !== 'home' || room) return false;
   const mine = saveData();
   let best = null;
-  for (const r of readRecs()) if (r.sv && cmpProg(progress(r.sv), progress(best ? best.sv : mine)) > 0) best = r;
+  for (const r of readRecs()) if (r.sv && r.sv.ver === 3 && cmpProg(progress(r.sv), progress(best ? best.sv : mine)) > 0) best = r;
   if (!best || cmpProg(progress(best.sv), progress(mine)) <= 0) return false;
   applySave(best.sv);
   lsSet(SAVE_KEY, JSON.stringify(saveData()));
   hasSave = hasProgress();
-  buildMap(state.map); placePlayer(0);
+  openMap(state.map); placePlayer(0);
   cam.x = state.x; cam.y = state.y - 10;
   toast('☁️ Ho caricato i progressi del tuo account dall\'altro dispositivo');
   renderHome();
@@ -2771,11 +3025,10 @@ function homeSummary() {
 function statsHTML() {
   const recs = readRecs().filter((r) => !r.st);
   const coopR = recs.filter((r) => r.coop);
-  const owned = MAPS.filter((m) => state.maps[m.id]).length;
   const c = state.cnt || {};
   const cells = [
     ['MONETE', fmt(state.coins)], ['GUADAGNATE IN TUTTO', fmt(state.earned)],
-    ['LIVELLO', String(state.level)], ['PRATI SBLOCCATI', owned + '/' + MAPS.length],
+    ['LIVELLO', String(state.level)], ['PRATI FINITI', MAPS.filter((m) => state.done[m.id]).length + '/' + MAPS.length],
     ['RINASCITE', String(state.rebirths || 0)], ['SEMI D\'ORO', String(state.seeds || 0)],
     ['TEMPO DI GIOCO', fmtTime(state.playTime)], ['GIORNI', String(state.day)],
     ['CIUFFI TAGLIATI', fmt(c.cells || 0)], ['CIUFFI D\'ORO', fmt(c.gold || 0)],
@@ -3127,8 +3380,10 @@ function resetWorldBits() {
   for (let q = particles.length - 1; q >= 0; q--) if (!particles[q].ui) particles.splice(q, 1);
 }
 function enterCoop() {
-  state.coop = { myDay: state.day, myT: state.t, others: new Map(), cutQ: [], claims: [], wd: 0, hitters: new Set(), liveT: 0, rg: stat.regrow(), gc: stat.goldChance(), rewarded: new Set(), taken: new Set(), askT: 0, wk: null, wkT: 0, maxN: seats.length, lastSent: '' };
-  if (state.map !== S.map || mapIdx !== S.map) buildMap(S.map); else buildMap(mapIdx);   // prato pulito per tutti
+  storeLawn();   // il tuo prato com'era
+  state.coop = { myDay: state.day, myT: state.t, others: new Map(), cutQ: [], claims: [], wd: 0, hitters: new Set(), liveT: 0, gc: stat.goldChance(), rewarded: new Set(), taken: new Set(), askT: 0, wk: null, wkT: 0, maxN: seats.length, lastSent: '' };
+  // si taglia il prato di chi ha creato la stanza, così come l'ha lasciato (gli altri lo ricevono dalla regia)
+  openMap(S.map, S.host === myId && S.map === state.map);
   placePlayer(seatIndex(myId));
   resetWorldBits();
   cam.x = state.x; cam.y = state.y - 10;
@@ -3144,9 +3399,10 @@ function enterCoop() {
 function exitCoop() {
   const c = state.coop; if (!c) return;
   closeSession();
+  storeLawn();   // se era il tuo prato, si ricorda cosa avete tagliato insieme
   state.coop = null;
   state.day = c.myDay; state.t = c.myT; state.fade = 0;
-  buildMap(state.map); placePlayer(0); resetWorldBits();
+  openMap(state.map); placePlayer(0); resetWorldBits();
   cam.x = state.x; cam.y = state.y - 10;
   if (state.screen === 'game' || state.screen === 'travel' || state.screen === 'end') state.screen = 'lobby';
   save(); syncSave(true);
@@ -3158,7 +3414,7 @@ function sharedTravel(i) {
   sfx.travel();
 }
 function arriveShared(i) {
-  buildMap(i); placePlayer(seatIndex(myId)); resetWorldBits();
+  openMap(i, false); placePlayer(seatIndex(myId)); resetWorldBits();
   cam.x = state.x; cam.y = state.y - 10;
   if (state.coop) { state.coop.travelTo = undefined; coopAskSnap(true); }
 }
@@ -3174,6 +3430,7 @@ function coopUpdate(dt) {
     p.walk += d * 0.18; p.moving = d > 0.15 || p.mv;
     if (p.tool === 'trimmer') p.spin += dt * 30;
     p.swing = Math.max(0, p.swing - dt);
+    if (p.tool === 'flame' && p.ex !== undefined && particles.length < 900) { const [fx, fy] = DIRV[p.dir]; const an = Math.atan2(fy, fx) + (Math.random() - 0.5) * 0.7, sp = 90 + Math.random() * 70; particles.push({ x: p.x + fx * 10, y: p.y - 5 + fy * 8, z: 4, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, vz: 10, t: 0, life: 0.3, col: ['#ffd23f', '#ff9a3c', '#e2453c'][(Math.random() * 3) | 0], fire: 1 }); }
     if (p.ex !== undefined) { p.tool === 'blower' && Math.random() < 0.3 && particles.length < 900 && particles.push({ x: p.x + DIRV[p.dir][0] * 14, y: p.y - 3 + DIRV[p.dir][1] * 14, z: 2, vx: DIRV[p.dir][0] * 80 + (Math.random() - 0.5) * 30, vy: DIRV[p.dir][1] * 80 + (Math.random() - 0.5) * 30, vz: 0, t: 0, life: 0.35, col: 'rgba(255,255,255,0.7)' }); }
   }
   if (state.screen !== 'game' && state.screen !== 'end') return;
@@ -3191,7 +3448,10 @@ function coopUpdate(dt) {
   if (c.wd > 0) { L.wd = Math.round(c.wd * 100) / 100; c.wd = 0; }
   if (regia) {
     L.r = 1; L.dt = Math.round(state.t * 10000) / 10000; L.dy = state.day; L.fd = Math.round(state.fade * 100) / 100;
-    L.rg = Math.round(stat.regrow() * 10) / 10; L.gc = Math.round(stat.goldChance() * 100000) / 100000;
+    L.gc = Math.round(stat.goldChance() * 100000) / 100000;
+    const rn = state.rain;
+    L.rn = rn ? { id: rn.id, x: Math.round(rn.x), y: Math.round(rn.y), r: Math.round(rn.r), vx: rn.vx, vy: rn.vy, t: Math.round(rn.t * 10) / 10, dur: rn.dur, gt: rn.gt } : null;
+    L.rt = Math.round(state.rainT);
     const ev = state.event;
     L.ev = ev ? { id: ev.id, type: ev.type, t: Math.round(ev.t * 10) / 10, dur: ev.dur, x: Math.round(ev.x), y: Math.round(ev.y), up: ev.up, hp: ev.hp, max: ev.max, face: ev.face } : null;
     L.dr = state.drops.map((d) => [d.id, Math.round(d.x), Math.round(d.y)]);
@@ -3208,7 +3468,7 @@ function onLive(id, d) {
   p.tx = d.x; p.ty = d.y; p.dir = DIRS[d.d] || 'down'; p.tool = (TOOLS[d.tl] || TOOLS[0]).id; p.mv = d.m; p.R = d.R || 7.5; p.name = d.n; p.t = Date.now(); p.ex = 1;
   if (Math.hypot(p.x - d.x, p.y - d.y) > 120) { p.x = d.x; p.y = d.y; }
   if (d.sw) p.swing = 0.22;
-  if (Array.isArray(d.c) && state.screen === 'game') for (const q of d.c) remoteCut(q | 0);
+  if (Array.isArray(d.c) && state.screen === 'game') for (const q of d.c) remoteCut(q | 0, p.tool === 'flame');
   if (coopRegia()) {
     if (Array.isArray(d.k)) for (const [kind, kid] of d.k) {
       if (kind === 'm' && state.event && state.event.id === kid) { popups.push({ x: state.event.x, y: state.event.y - 14, t: 0, text: 'PRESA DA ' + nomePixel(d.n), col: '#ff9a8a', scale: 1 }); state.event = null; }
@@ -3221,7 +3481,13 @@ function onLive(id, d) {
 function mirrorRegia(d) {
   const c = state.coop;
   state.t = d.dt; state.day = d.dy; state.fade = d.fd || 0;
-  if (d.rg) c.rg = d.rg; if (d.gc !== undefined) c.gc = d.gc;
+  if (d.gc !== undefined) c.gc = d.gc;
+  // pioggia della regia
+  const rn = d.rn;
+  if (!rn) { if (state.rain) { state.rain = null; coopAskSnap(true); } }
+  else if (!state.rain || state.rain.id !== rn.id) { state.rain = Object.assign({}, rn, { tx: rn.x, ty: rn.y }); if (rn.t < 3) { state.banner = { text: 'PIOGGIA!', sub: "L'ERBA RICRESCE SOTTO LA NUVOLA", t: 0 }; sfx.event(); } }
+  else { const cr = state.rain; cr.tx = rn.x; cr.ty = rn.y; cr.t = rn.t; cr.dur = rn.dur; cr.r = rn.r; cr.gt = rn.gt; }
+  if (typeof d.rt === 'number') state.rainT = d.rt;
   // evento
   const e = d.ev, cur = state.event;
   if (!e) state.event = null;
@@ -3246,7 +3512,8 @@ function mirrorRegia(d) {
     if ((d.wk.ids || []).includes(myId)) { reward(400, d.wk.x || state.x, d.wk.y || state.y, 'ABBATTUTA!'); sfx.gold(); state.xp += 40; bump('weed'); }
   }
 }
-function remoteCut(q) {
+function remoteCut(q, fire) {
+  if (fire && q >= 0 && q < grow.length && grow[q] >= 0) burnt[q] = 255;
   if (q < 0 || q >= grow.length || grow[q] < 0) return;
   const g = grow[q];
   if (g > 0.12 && Math.random() < 0.35 && particles.length < 700) {
@@ -3421,12 +3688,12 @@ load();
 hasSave = hasProgress();
 let nuova = false;
 try { if (sessionStorage.getItem('prato-nuova')) { sessionStorage.removeItem('prato-nuova'); nuova = true; } } catch (e) { /* niente */ }
-if (state.map) buildMap(state.map);
+openMap(state.map);
 placePlayer(0);
 cam.x = state.x; cam.y = state.y - 10;
 window.__game = {
   state, keys, cam, mouse, UPG, buy, pickups, SKILLS, learn, resetSkills, TOOLS, buyTool, selectTool, MAPS, buyMap, travel, firework, SEEDS, buySeed, rebirth, startEvent, AU, sfx, goHome,
-  startGame, createRoom, openGame, leaveRoom, adoptRemote, syncSave, readRecs, closeSession, joy, get room() { return room; }, get S() { return S; }, get seats() { return seats; },
+  startGame, upgMax, openMapFresh: (i) => openMap(i, false), get props() { return props; }, createRoom, openGame, leaveRoom, adoptRemote, syncSave, readRecs, closeSession, joy, get room() { return room; }, get S() { return S; }, get seats() { return seats; },
   get grow() { return grow; }, get gold() { return gold; }, get cutN() { return cutN; }, get mapIdx() { return mapIdx; }, regiaId, myId, Net, setTouch,
   step(n, dt = 1 / 30) { for (let i = 0; i < n; i++) update(dt); }, render: draw,
 };

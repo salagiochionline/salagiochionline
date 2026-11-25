@@ -34,7 +34,7 @@
     /* statistiche della home */
     'Monete': 'Coins', 'Guadagnate in tutto': 'Earned in total', 'Livello': 'Level', 'Prati sbloccati': 'Lawns unlocked',
     'Rinascite': 'Rebirths', "Semi d'oro": 'Golden seeds', 'Tempo di gioco': 'Play time', 'Giorni': 'Days',
-    'Ciuffi tagliati': 'Tufts mowed', "Ciuffi d'oro": 'Golden tufts', 'Talpe prese': 'Moles caught', 'Erbacce abbattute': 'Weeds cut down',
+    'Ciuffi tagliati': 'Tufts mowed', 'Prati finiti': 'Lawns finished', "Ciuffi d'oro": 'Golden tufts', 'Talpe prese': 'Moles caught', 'Erbacce abbattute': 'Weeds cut down',
     'Sessioni con gli amici': 'Sessions with friends', 'Monete con gli amici': 'Coins with friends', 'Record monete al secondo': 'Best coins per second', 'Sessioni in tutto': 'Sessions in total',
 
     /* --- stanza (HTML) --- */
@@ -83,7 +83,7 @@
     '+1 PUNTO ABILITA': '+1 SKILL POINT',
     'POTENZIAMENTI': 'UPGRADES', 'ATTREZZI': 'TOOLS', 'PRATI': 'LAWNS', 'SEMI': 'SEEDS',
     'MAX': 'MAX', 'USA': 'USE', 'IN USO': 'IN USE', 'VAI': 'GO', 'SEI QUI': 'HERE', 'BLOCCATO': 'LOCKED', 'TASTO': 'KEY',
-    'SIETE QUI': 'YOU ARE HERE', 'DA SOLO': 'SOLO', 'IL PRATO DI TUTTI ADESSO': "EVERYONE'S LAWN NOW", 'PORTA TUTTI QUI': 'TAKE EVERYONE HERE', 'LO SCEGLIE CHI HA CREATO': 'THE HOST CHOOSES',
+    'SIETE QUI': 'HERE', 'DA SOLO': 'SOLO', 'IL PRATO DI TUTTI ADESSO': "EVERYONE'S LAWN NOW", 'PORTA TUTTI QUI': 'TAKE EVERYONE HERE', 'LO SCEGLIE CHI HA CREATO': 'THE HOST CHOOSES',
     'SI PUO RINASCERE SOLO GIOCANDO DA SOLO': 'YOU CAN ONLY BE REBORN IN SOLO',
     /* potenziamenti */
     'LAMA LARGA': 'WIDE BLADE', 'TAGLI UNA STRISCIA PIU LARGA': 'MOW A WIDER STRIP',
@@ -95,6 +95,10 @@
     /* bonus */
     'TURBO': 'TURBO', 'MAXI LAMA': 'MEGA BLADE', "PIOGGIA D'ORO": 'GOLDEN RAIN',
     /* attrezzi */
+    'FORBICI': 'SCISSORS', 'UN CIUFFO ALLA VOLTA: CI VUOLE PAZIENZA': 'ONE TUFT AT A TIME: BE PATIENT',
+    'LANCIAFIAMME': 'FLAMETHROWER', "BRUCIA L'ERBA LONTANO DAVANTI A TE": 'BURNS THE GRASS FAR AHEAD OF YOU',
+    'QUADERNO DEL GIARDINIERE': "GARDENER'S NOTEBOOK", '+15% ESPERIENZA': '+15% EXPERIENCE',
+    'CIELO SERENO': 'CLEAR SKY', 'LA PIOGGIA ARRIVA 10% PIU DI RADO': 'RAIN COMES 10% LESS OFTEN',
     'TOSAERBA': 'LAWNMOWER', 'TAGLIA UNA STRISCIA DAVANTI A TE': 'MOWS A STRIP IN FRONT OF YOU',
     'DECESPUGLIATORE': 'STRIMMER', 'TAGLIA TUTTO ATTORNO, ANCHE DA FERMO': 'CUTS ALL AROUND, EVEN STANDING STILL',
     'FALCE': 'SCYTHE', 'COLPI LARGHI CAMMINANDO, ERBA X1,5': 'WIDE SWINGS AS YOU WALK, GRASS X1.5',
@@ -110,8 +114,11 @@
     /* prati e stagioni */
     'GIARDINO': 'GARDEN', 'PARCO': 'PARK', 'CAMPO DA GOLF': 'GOLF COURSE', 'FATTORIA': 'FARM',
     'PRIMAVERA': 'SPRING', 'ESTATE': 'SUMMER', 'AUTUNNO': 'AUTUMN', 'INVERNO': 'WINTER',
-    'PRIMAVERA, IL PRATO DI CASA': 'SPRING, YOUR HOME LAWN', 'ESTATE, ERBA X5': 'SUMMER, GRASS X5',
-    'AUTUNNO, ERBA X25': 'AUTUMN, GRASS X25', 'INVERNO, ENORME, ERBA X125': 'WINTER, HUGE, GRASS X125',
+    'PRIMAVERA, IL PRATO DI CASA': 'SPRING, YOUR HOME LAWN', 'ESTATE, ERBA X4': 'SUMMER, GRASS X4',
+    'AUTUNNO, ERBA X10': 'AUTUMN, GRASS X10', 'INVERNO, ENORME, ERBA X30': 'WINTER, HUGE, GRASS X30',
+    'FINISCI IL GIARDINO PER POTER RINASCERE': 'FINISH THE GARDEN TO BE REBORN', 'PRATO DOPO': 'NEXT LAWN',
+    'PRATO FINITO!': 'LAWN DONE!', 'DI NUOVO PERFETTO!': 'PERFECT AGAIN!', 'ARCOBALENO! X2': 'RAINBOW! X2',
+    "L'ERBA RICRESCE SOTTO LA NUVOLA": 'GRASS REGROWS UNDER THE CLOUD', 'MANCA 1 CIUFFO': '1 TUFT LEFT',
     'SPAZIO PER SALTARE': 'SPACE TO SKIP',
     /* eventi */
     'UNA TALPA!': 'A MOLE!', 'PRENDILA PRIMA CHE SCAPPI': 'CATCH IT BEFORE IT ESCAPES',
@@ -121,7 +128,13 @@
     'TALPA': 'MOLE', 'ERBACCIA': 'WEED', 'PIOGGIA': 'RAIN', 'CANE': 'DOG',
     'PRESA!': 'CAUGHT!', 'SCAPPATA...': 'GOT AWAY...', 'ABBATTUTA!': 'CUT DOWN!', 'FALCIATA!': 'SWEEP!', 'FORTUNA!': 'LUCKY!',
     /* albero delle abilità */
-    'TAGLIO': 'CUTTING', 'NATURA': 'NATURE',
+    'TAGLIO': 'CUTTING', 'NATURA': 'NATURE', 'CIELO': 'SKY',
+    'OCCHIO VERDE': 'GREEN EYE', "LE FRECCE VERSO L'ULTIMA ERBA COMPAIONO PRIMA": 'ARROWS TO THE LAST GRASS SHOW UP SOONER',
+    'PREVISIONI': 'FORECAST', 'LA PIOGGIA ARRIVA 20% PIU TARDI': 'RAIN COMES 20% LATER',
+    'PIOGGERELLA': 'DRIZZLE', "SOTTO LA PIOGGIA L'ERBA CRESCE 25% PIU PIANO": 'GRASS GROWS 25% SLOWER IN THE RAIN',
+    'NUVOLE PICCOLE': 'SMALL CLOUDS', 'LE NUVOLE SONO 15% PIU PICCOLE': 'CLOUDS ARE 15% SMALLER',
+    'ACQUAZZONE': 'QUICK SHOWER', 'LA PIOGGIA DURA 35% DI MENO': 'RAIN LASTS 35% LESS',
+    'ARCOBALENO': 'RAINBOW', 'DOPO LA PIOGGIA, 30 S DI MONETE X2': 'AFTER THE RAIN, 30 S OF COINS X2',
     'LAMA AFFILATA': 'SHARP BLADE', '+10% LARGHEZZA DI TAGLIO': '+10% CUTTING WIDTH',
     'PASSO DEL GIARDINIERE': "GARDENER'S STRIDE", '+6% VELOCITA': '+6% SPEED',
     'COMBO': 'COMBO', 'TAGLIA ERBA ALTA SENZA FERMARTI: MONETE FINO A X2': 'MOW TALL GRASS NONSTOP: COINS UP TO X2',
@@ -189,6 +202,13 @@
     [/^(TURBO|MAXI LAMA|PIOGGIA D'ORO)!$/, (m, a, tr) => tr(a) + '!'],
     [/^(PRESA!|ABBATTUTA!|FORTUNA!) \+(.+)$/, (m, a, v, tr) => tr(a) + ' +' + v],
     [/^PRESA DA (.+)$/, 'CAUGHT BY $1'],
+    [/^PIOGGIA TRA (\d+)S$/, 'RAIN IN $1S'],
+    [/^ARCOBALENO X2 (\d+)S$/, 'RAINBOW X2 $1S'],
+    [/^MANCANO (\d+) CIUFFI$/, '$1 TUFTS LEFT'],
+    [/^SI PARTE TRA (\d+)S$/, 'LEAVING IN $1S'],
+    [/^SBLOCCATO: (.+)$/, (m, a, tr) => 'UNLOCKED: ' + (tr(a) || a)],
+    [/^FINISCI IL (.+) PER SBLOCCARLO$/, (m, a, tr) => 'FINISH THE ' + (tr(a) || a) + ' TO UNLOCK IT'],
+    [/^(.+) · FINITO$/, (m, a, tr) => (tr(a) || a) + ' · DONE'],
     [/^(\d+H )?(\d+)MIN$/, (m, h, n) => (h || '') + n + 'MIN'],
   ],
 });
