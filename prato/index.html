@@ -590,9 +590,17 @@ function lawnPct(id) {
 function openMap(i, load = true) {
   buildMap(i);
   if (load) decodeLawn(lawnStore[MAPS[i].id] && lawnStore[MAPS[i].id].g);
+  if (lawnMine()) applyGold(stat.goldChance());
   countLawn(); state.full = cutCount >= cuttable;
   state.rain = null; state.rainT = 45 + Math.random() * 30;
 }
+// più erba dorata (potenziamento, abilità, semi): i ciuffi alti diventano d'oro subito.
+// La scelta dipende solo dalla cella e dalla probabilità, così insieme è uguale per tutti.
+function applyGold(f) {
+  if (!grow) return;
+  for (let q = 0; q < grow.length; q++) if (grow[q] >= 0.85 && !gold[q] && hash01(q ^ 0x5bd1e995, (cutN[q] || 0) + 4099) < f) gold[q] = 1;
+}
+function goldNow() { if (lawnMine()) applyGold(stat.goldChance()); }
 function countLawn() {
   let cc = 0, ct = 0;
   for (let q = 0; q < grow.length; q++) { const v = grow[q]; if (v < 0) continue; ct++; if (v < 0.35) cc++; }
@@ -890,16 +898,19 @@ const SEEDS = [
   { id: 'sereno', name: 'CIELO SERENO', desc: 'LA PIOGGIA ARRIVA 10% PIU DI RADO', base: 3, k: 1.8, max: 5, icon: 'sun' },
   { id: 'golden', name: 'SEME D\'ORO', desc: "+50% CIUFFI D'ORO", base: 3, k: 1.8, max: 5, icon: 'seed' },
   { id: 'family', name: 'ATTREZZI DI FAMIGLIA', desc: 'TIENI GLI ATTREZZI QUANDO RINASCI', base: 8, k: 1, max: 1, icon: 'trimmer' },
+  { id: 'giant', name: 'LAMA GIGANTE', desc: '+50% RAGGIO DI TAGLIO, PER SEMPRE', base: 4, k: 1.5, max: 15, icon: 'blade' },
+  { id: 'stride', name: 'PASSO DEL GIGANTE', desc: '+25% VELOCITA, PER SEMPRE', base: 3, k: 1.5, max: 10, icon: 'bolt' },
+  { id: 'wave', name: 'ONDA VERDE', desc: "OGNI 4 S UN'ONDA TAGLIA TUTTO ATTORNO", base: 6, k: 1.55, max: 15, icon: 'wave' },
 ];
 const su = (id) => state.seedUpg[id] || 0;
 const seedCost = (u) => Math.ceil(u.base * Math.pow(u.k, su(u.id)));
 // semi d'oro: tanti più prati hai finito (e più sono grandi), metà per il prato a cui sei arrivato
-const SEMI_PRATO = [2, 5, 12, 30];
+const SEMI_PRATO = [3, 8, 20, 50];
 function seedsNow() {
   if (!state.done.garden) return 0;
   let n = 0;
   MAPS.forEach((m, i) => { if (state.done[m.id]) n += SEMI_PRATO[i]; else if (state.maps[m.id]) n += SEMI_PRATO[i] * 0.5 * lawnPct(m.id); });
-  return Math.floor(n * (1 + 0.1 * state.rebirths));
+  return Math.floor(n * (1 + 0.25 * state.rebirths));
 }
 function buySeed(u) {
   if (su(u.id) >= u.max) return;
@@ -907,6 +918,7 @@ function buySeed(u) {
   sfx.buy();
   state.seeds -= seedCost(u);
   state.seedUpg[u.id] = su(u.id) + 1;
+  if (u.id === 'golden') goldNow();
   for (let q = 0; q < 18; q++) particles.push({ ui: true, x: mouse.x, y: mouse.y, z: 0, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.9) * 140, vz: 0, t: 0, life: 0.7, col: [P.gold, '#ffb347', P.white][q % 3] });
   save();
 }
@@ -1106,11 +1118,20 @@ function drawRain(t) {
 // ultimi ciuffi: riquadri che lampeggiano sul prato
 function drawLeft(t) {
   if (!left.on || state.screen !== 'game') return;
-  if (Math.sin(t * 8) < -0.3) return;
-  vg.fillStyle = 'rgba(255,242,163,0.9)';
+  // luce gialla morbida che "respira" piano (niente acceso/spento)
+  const a = 0.45 + 0.2 * Math.sin(t * 2.2);
   for (const q of left.list) {
     const x = LAWN0 + (q % N) * C, y = LAWN0 + ((q / N) | 0) * C;
+    vg.fillStyle = `rgba(255,242,163,${(a * 0.3).toFixed(3)})`; vg.fillRect(x - 2, y - 2, C + 4, C + 4);
+    vg.fillStyle = `rgba(255,210,63,${a.toFixed(3)})`;
     vg.fillRect(x - 1, y - 1, C + 2, 1); vg.fillRect(x - 1, y + C, C + 2, 1); vg.fillRect(x - 1, y, 1, C); vg.fillRect(x + C, y, 1, C);
+  }
+  // una freccina che scende piano sopra ai 3 più vicini
+  const near = left.list.map((q) => [q, (LAWN0 + (q % N) * C + 4 - state.x) ** 2 + (LAWN0 + ((q / N) | 0) * C + 4 - state.y) ** 2]).sort((p, q) => p[1] - q[1]).slice(0, 3);
+  for (const [q] of near) {
+    const x = LAWN0 + (q % N) * C + 4, y = LAWN0 + ((q / N) | 0) * C - 6 + Math.round(Math.sin(t * 3) * 2);
+    px(vg, x - 3, y - 4, P.ink, 7, 2); px(vg, x - 2, y - 2, P.ink, 5, 2); px(vg, x - 1, y, P.ink, 3, 2);
+    px(vg, x - 2, y - 4, P.goldHi, 5, 1); px(vg, x - 1, y - 2, P.goldHi, 3, 1); px(vg, x, y, P.goldHi, 1, 1);
   }
 }
 
@@ -1232,6 +1253,8 @@ const SKILLS = [
   { id: 'l5', br: 'luck', gx: 1, gy: 3, req: 'l3', max: 1, cost: 3, icon: 'sunset', name: "ORA D'ORO", desc: 'AL TRAMONTO LE MONETE VALGONO X2' },
 ];
 const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
+// potere delle rinascite, automatico: ogni rinascita +25% raggio, +10% velocità, +50% monete
+function rebornPower(k) { const n = state.rebirths || 0; return k === 'r' ? 1 + 0.25 * n : k === 's' ? 1 + 0.1 * n : 1 + 0.5 * n; }
 const sk = (id) => state.skills[id] || 0;
 function canLearn(k) {
   return sk(k.id) < k.max && (!k.req || sk(k.req) > 0) && state.points >= k.cost;
@@ -1241,6 +1264,7 @@ function learn(k) {
   sfx.buy();
   state.points -= k.cost;
   state.skills[k.id] = sk(k.id) + 1;
+  if (k.id === 'n2') goldNow();
   for (let q = 0; q < 18; q++) particles.push({ ui: true, x: mouse.x, y: mouse.y, z: 0, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.9) * 140, vz: 0, t: 0, life: 0.7, col: [BRANCH[k.br].col, P.white, P.goldHi][q % 3] });
   save();
   return true;
@@ -1274,7 +1298,7 @@ const state = {
   event: null, eventTimer: 40, drops: [], uiT: -9, coinBump: 0,
   swingT: 0, swing: 0, spin: 0,
   ep: 0, cnt: { cells: 0, gold: 0, mole: 0, weed: 0, dog: 0 }, best: { rate: 0 },
-  coop: null, travelShared: false,
+  coop: null, travelShared: false, wt: 0,
 };
 const xpNeed = (l) => Math.ceil(150 * Math.pow(1.45, l - 1));
 
@@ -1497,9 +1521,9 @@ function popTransform(t0, cx, cy) {
 
 // statistiche derivate dai potenziamenti e dai bonus attivi
 const stat = {
-  radius: () => (7.5 + 1 * state.upg.blade) * (1 + 0.1 * sk('c1')) * (state.active.maxi ? 2 : 1),
-  speed: () => CFG.speed * TOOL[state.tool].speed * (1 + 0.06 * state.upg.speed) * (1 + 0.06 * sk('c2')) * (state.active.turbo ? 1.8 : 1),
-  value: () => CFG.coinPerCell * mapValue() * teamMult() * (1 + 0.25 * su('roots')) * (1 + 0.25 * state.upg.value) * (state.active.rain ? 3 : 1) * (state.rainbow > 0 ? 2 : 1) * state.combo * stat.dayMult(),
+  radius: () => (7.5 + 1 * state.upg.blade) * (1 + 0.1 * sk('c1')) * (state.active.maxi ? 2 : 1) * rebornPower('r') * (1 + 0.5 * su('giant')),
+  speed: () => CFG.speed * TOOL[state.tool].speed * (1 + 0.06 * state.upg.speed) * (1 + 0.06 * sk('c2')) * (state.active.turbo ? 1.8 : 1) * rebornPower('s') * (1 + 0.25 * su('stride')),
+  value: () => CFG.coinPerCell * mapValue() * teamMult() * rebornPower('v') * (1 + 0.25 * su('roots')) * (1 + 0.25 * state.upg.value) * (state.active.rain ? 3 : 1) * (state.rainbow > 0 ? 2 : 1) * state.combo * stat.dayMult(),
   goldChance: () => (0.004 + 0.006 * state.upg.gold) * (1 + 0.4 * sk('n2')) * (1 + 0.5 * su('golden')),
   xpMult: () => (1 + 0.2 * su('wisdom')) * (1 + 0.15 * state.upg.xp),
   // pioggia (la manda il cielo del prato): ogni quanto, quanto è grande, quanto fa crescere, quanto dura
@@ -1584,6 +1608,7 @@ function buy(u) {
   sfx.buy();
   state.coins -= cost;
   state.upg[u.id]++;
+  if (u.id === 'gold') { goldNow(); popups.push({ x: state.x, y: state.y - 30, t: 0, text: "PIU ERBA D'ORO!", col: P.gold, scale: 1 }); }
   for (let q = 0; q < 14; q++) particles.push({ ui: true, x: mouse.x, y: mouse.y, z: 0, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.9) * 120, vz: 0, t: 0, life: 0.6, col: [P.gold, P.goldHi, P.white][q % 3] });
   save();
 }
@@ -1643,8 +1668,9 @@ function update(dt) {
   state.screenT += dt;
   if (state.coop) coopUpdate(dt);
   if (state.screen !== 'game' || state.shop || state.tree || state.pause) audioMow(dt, false, false);
-  if (state.screen === 'travel') { updateTravel(dt); return; }
+  if (state.screen === 'travel') { state.wt += dt; updateTravel(dt); return; }
   if (state.screen !== 'game') {
+    state.wt += dt;
     // in home e a fine gioco il prato resta vivo sullo sfondo ma non si gioca
     cam.x += Math.sin(state.time * 0.1) * 6 * dt; cam.y += Math.cos(state.time * 0.13) * 4 * dt;
     updateParticles(dt);
@@ -1655,7 +1681,9 @@ function update(dt) {
   if (state.banner) { state.banner.t += dt; if (state.banner.t > 2.4) state.banner = null; }
   // da soli negozio, abilità e menu mettono in pausa il prato; insieme il prato va avanti (sei solo fermo)
   const frozen = state.shop || state.tree || state.pause;
-  if (frozen && !state.coop) { updateParticles(dt); return; }
+  // (insieme si ferma tutto solo se nella stanza non c'è nessun altro: gli amici continuano a giocare)
+  if (frozen && (!state.coop || othersAlive() === 0)) { updateParticles(dt, true); return; }
+  state.wt += dt;
 
   // --- movimento libero in 8 direzioni
   let ix = 0, iy = 0;
@@ -1736,6 +1764,18 @@ function update(dt) {
   if (sk('c3')) {
     if (tall > 0) { state.combo = Math.min(stat.comboMax(), state.combo + tall * 0.004); state.comboT = 0; }
     else { state.comboT += dt; if (state.comboT > 1.2) state.combo = Math.max(1, state.combo - dt * 1.5); }
+  }
+  // onda verde (semi d'oro): ogni 4 s un'onda taglia tutto attorno, sempre più grande
+  if (su('wave') && !frozen) {
+    state.waveT = (state.waveT || 0) + dt;
+    if (state.waveT >= 4) {
+      state.waveT = 0;
+      const wr = 36 + 22 * su('wave') + stat.radius();
+      const r = cutCircle(state.x, state.y - 4, wr, 0);
+      gained += r.gained; xpGain += r.xpGain; tall += r.tall;
+      rings.push({ x: state.x, y: state.y - 4, r: wr, t: 0 });
+      if (r.gained > 0) { sfx.swing(); state.shake = Math.max(state.shake, 0.15); }
+    }
   }
   // falciata: dopo 8 secondi di taglio, un'ondata taglia tutto attorno
   if (sk('c5')) {
@@ -1847,6 +1887,7 @@ function update(dt) {
   if (saveTimer > 5) { saveTimer = 0; save(); storeLawn(); syncSave(false); }
 }
 let burnT = 0;
+const rings = [];   // anelli delle onde verdi (solo disegno)
 // prato finito: festa, prossimo prato sbloccato e partenza dopo qualche secondo
 function lawnDone() {
   const m = MAPS[mapIdx], next = MAPS[mapIdx + 1];
@@ -1943,9 +1984,10 @@ function hash01(a, b) {
 }
 let saveTimer = 0;
 
-function updateParticles(dt) {
+function updateParticles(dt, uiOnly) {
   for (let q = particles.length - 1; q >= 0; q--) {
     const p = particles[q];
+    if (uiOnly && !p.ui) continue;
     p.t += dt;
     if (p.ui) { p.vy += 300 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     else {
@@ -1955,6 +1997,7 @@ function updateParticles(dt) {
     }
     if (p.t > p.life) particles.splice(q, 1);
   }
+  if (uiOnly) return;
   for (let q = popups.length - 1; q >= 0; q--) { popups[q].t += dt; if (popups[q].t > 1.1) popups.splice(q, 1); }
 }
 
@@ -2011,7 +2054,7 @@ function draw() {
   const ox = Math.round(cam.x - VW / 2), oy = Math.round(cam.y - VH / 2);
   const shake = state.shake > 0 && state.shakeOn ? (Math.random() - 0.5) * 2 : 0;
   vg.setTransform(1, 0, 0, 1, -ox + shake, -oy);
-  const t = state.time;
+  const t = state.wt;   // tempo del mondo: fermo in pausa, nel negozio e nelle abilità
   const light = dayLight(state.t);
 
   // --- terreno a celle, dall'alto in basso (le righe sotto coprono i fili di quelle sopra)
@@ -2132,6 +2175,13 @@ function draw() {
     vg.fillRect(Math.round(p.x) + (p.t * 9 % 2 | 0), Math.round(p.y - p.z) - 1, 1, 1);
   }
 
+  for (let q = rings.length - 1; q >= 0; q--) {
+    const g = rings[q]; g.t += 1 / 60;
+    if (g.t > 0.5) { rings.splice(q, 1); continue; }
+    const rr = g.r * Math.min(1, g.t / 0.25), a = 1 - g.t / 0.5;
+    vg.strokeStyle = `rgba(157,255,122,${a.toFixed(2)})`; vg.lineWidth = 2;
+    vg.beginPath(); vg.ellipse(Math.round(g.x), Math.round(g.y), rr, rr * 0.9, 0, 0, Math.PI * 2); vg.stroke();
+  }
   drawLeft(t);
   drawRainWorld(t);
   drawCloud(t);
@@ -2444,21 +2494,16 @@ function drawHUD() {
     px(vg, sxp - 1, by - 1, P.ink, 5, 7); px(vg, sxp, by, P.gold, 3, 5); px(vg, sxp, by, P.goldHi, 1, 1);
     textRow(prato, x0 + PAD, 25, 15, '#c8ffb0');
   }
-  // --- freccia verso l'erba rimasta più vicina, se non si vede
-  if (left.on && left.list.length && !state.shop && !state.tree) {
-    let best = null, bd = 1e18;
-    for (const q of left.list) { const x = LAWN0 + (q % N) * C + 4, y = LAWN0 + ((q / N) | 0) * C + 4, d = (x - state.x) ** 2 + (y - state.y) ** 2; if (d < bd) { bd = d; best = [x, y]; } }
-    const sx = (best[0] - cam.x) * WS / US + VW / 2, sy = (best[1] - cam.y) * WS / US + VH / 2;
-    if (sx < 8 || sx > VW - 8 || sy < 8 || sy > VH - 8) {
-      const cx = VW / 2, cy = VH / 2, an = Math.atan2(sy - cy, sx - cx);
-      const k = Math.min((VW / 2 - 26) / Math.max(1e-3, Math.abs(Math.cos(an))), (VH / 2 - 26) / Math.max(1e-3, Math.abs(Math.sin(an))));
-      const ax = cx + Math.cos(an) * k, ay = cy + Math.sin(an) * k, bob = Math.sin(state.time * 8) * 2;
-      const tip = [ax + Math.cos(an) * (8 + bob), ay + Math.sin(an) * (8 + bob)];
-      const l = [ax + Math.cos(an + 2.5) * 7, ay + Math.sin(an + 2.5) * 7], r = [ax + Math.cos(an - 2.5) * 7, ay + Math.sin(an - 2.5) * 7];
-      vg.fillStyle = P.ink; vg.beginPath(); vg.moveTo(tip[0] + Math.cos(an) * 2, tip[1] + Math.sin(an) * 2); vg.lineTo(l[0] + Math.cos(an + 2.5) * 2, l[1] + Math.sin(an + 2.5) * 2); vg.lineTo(r[0] + Math.cos(an - 2.5) * 2, r[1] + Math.sin(an - 2.5) * 2); vg.fill();
-      vg.fillStyle = P.goldHi; vg.beginPath(); vg.moveTo(tip[0], tip[1]); vg.lineTo(l[0], l[1]); vg.lineTo(r[0], r[1]); vg.fill();
+  // --- frecce ai bordi dello schermo: erba rimasta più vicina e nuvola della pioggia
+  if (!state.shop && !state.tree) {
+    if (left.on && left.list.length) {
+      let best = null, bd = 1e18;
+      for (const q of left.list) { const x = LAWN0 + (q % N) * C + 4, y = LAWN0 + ((q / N) | 0) * C + 4, d = (x - state.x) ** 2 + (y - state.y) ** 2; if (d < bd) { bd = d; best = [x, y]; } }
+      edgeArrow(best[0], best[1], P.goldHi, null);
     }
+    if (state.rain) edgeArrow(state.rain.x, state.rain.y, '#7fc8ff', 'cloud');
   }
+  drawMinimap();
   // --- pulsante del negozio (in basso a destra)
   {
     const label = IS_TOUCH ? 'NEGOZIO' : 'NEGOZIO [E]';
@@ -2500,7 +2545,7 @@ function drawHUD() {
   }
   // --- insieme: chi c'è nel prato (sotto alla giornata)
   if (state.coop) {
-    let y = 46;
+    let y = 46 + MM + 8;
     const list = seats.filter((s) => s.id === myId || isAlive(s.id));
     for (const s of list) {
       const nm = nomePixel(s.id === myId ? (myName || 'TU') : nameOf(s.id), 10) + (s.id === S.host ? ' *' : '');
@@ -2564,6 +2609,63 @@ function drawHUD() {
 }
 
 
+// freccia sul bordo dello schermo che punta a un punto del prato fuori vista
+function edgeArrow(wx, wy, col, icon) {
+  const sx = (wx - cam.x) * WS / US + VW / 2, sy = (wy - cam.y) * WS / US + VH / 2;
+  if (sx >= 8 && sx <= VW - 8 && sy >= 8 && sy <= VH - 8) return;
+  const cx = VW / 2, cy = VH / 2, an = Math.atan2(sy - cy, sx - cx);
+  const k = Math.min((VW / 2 - 30) / Math.max(1e-3, Math.abs(Math.cos(an))), (VH / 2 - 30) / Math.max(1e-3, Math.abs(Math.sin(an))));
+  const ax = cx + Math.cos(an) * k, ay = cy + Math.sin(an) * k, bob = Math.sin(state.time * 4) * 2;
+  const tip = [ax + Math.cos(an) * (9 + bob), ay + Math.sin(an) * (9 + bob)];
+  const l = [ax + Math.cos(an + 2.5) * 7, ay + Math.sin(an + 2.5) * 7], r = [ax + Math.cos(an - 2.5) * 7, ay + Math.sin(an - 2.5) * 7];
+  vg.fillStyle = P.ink; vg.beginPath(); vg.moveTo(tip[0] + Math.cos(an) * 2, tip[1] + Math.sin(an) * 2); vg.lineTo(l[0] + Math.cos(an + 2.5) * 2, l[1] + Math.sin(an + 2.5) * 2); vg.lineTo(r[0] + Math.cos(an - 2.5) * 2, r[1] + Math.sin(an - 2.5) * 2); vg.fill();
+  vg.fillStyle = col; vg.beginPath(); vg.moveTo(tip[0], tip[1]); vg.lineTo(l[0], l[1]); vg.lineTo(r[0], r[1]); vg.fill();
+  if (icon) { const ix = Math.round(ax - Math.cos(an) * 12 - 5), iy = Math.round(ay - Math.sin(an) * 12 - 5); panel(ix - 2, iy - 2, 14, 14, 'blue'); vg.drawImage(icons[icon], ix, iy); }
+}
+// ---------------- mini mappa (in alto a destra, sotto alla giornata) ----------------
+const MM = 64;
+const [mmC, mmG] = canvas(MM, MM);
+const mmImg = mmG.createImageData(MM, MM);
+let mmT = -1;
+const MM_COL = { tall: [47, 143, 63], med: [76, 175, 80], cut: [157, 220, 106], gold: [255, 210, 63], burnt: [70, 52, 40], none: [140, 128, 110] };
+function drawMinimap() {
+  if (state.shop || state.tree) return;
+  const x0 = VW - MM - 8, y0 = 46;
+  if (state.time - mmT > 0.5 || mmT < 0) {
+    mmT = state.time;
+    const d = mmImg.data;
+    for (let y = 0; y < MM; y++) for (let x = 0; x < MM; x++) {
+      // per ogni puntino della mappa guardo un blocchetto di celle: conta l'erba alta che c'è
+      const i0 = Math.floor(x * N / MM), j0 = Math.floor(y * N / MM), i1 = Math.max(i0 + 1, Math.floor((x + 1) * N / MM)), j1 = Math.max(j0 + 1, Math.floor((y + 1) * N / MM));
+      let tallN = 0, medN = 0, cutN2 = 0, goldN = 0, burnN = 0, tot = 0;
+      for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+        const q = j * N + i, g = grow[q]; if (g < 0) continue; tot++;
+        if (g >= 0.85) { tallN++; if (gold[q]) goldN++; } else if (g >= 0.35) medN++; else { cutN2++; if (burnt[q]) burnN++; }
+      }
+      const c = !tot ? MM_COL.none : tallN + medN === 0 ? (burnN ? MM_COL.burnt : MM_COL.cut) : tallN >= medN ? MM_COL.tall : MM_COL.med;
+      const o = (y * MM + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    }
+    mmG.putImageData(mmImg, 0, 0);
+  }
+  panel(x0 - 3, y0 - 3, MM + 6, MM + 7, 'dark');
+  vg.drawImage(mmC, x0, y0);
+  const mx = (wx) => x0 + clamp((wx - LAWN0) / (N * C), 0, 1) * (MM - 1), my = (wy) => y0 + clamp((wy - LAWN0) / (N * C), 0, 1) * (MM - 1);
+  // quello che vedi sullo schermo
+  vg.strokeStyle = 'rgba(255,255,255,0.55)'; vg.lineWidth = 1;
+  const vw = WW / (N * C) * MM, vh = WH / (N * C) * MM;
+  vg.strokeRect(Math.round(mx(cam.x) - vw / 2) + 0.5, Math.round(my(cam.y) - vh / 2) + 0.5, Math.round(vw), Math.round(vh));
+  // ultimi ciuffi (fissi, niente lampeggio)
+  if (left.on) for (const q of left.list) { const lx = Math.round(x0 + (q % N) / N * MM), ly = Math.round(y0 + ((q / N) | 0) / N * MM); px(vg, lx - 1, ly - 1, P.ink, 4, 4); px(vg, lx, ly, P.goldHi, 2, 2); }
+  // nuvola
+  if (state.rain) {
+    const r = state.rain.r / (N * C) * MM;
+    vg.fillStyle = 'rgba(127,200,255,0.45)'; vg.beginPath(); vg.arc(mx(state.rain.x), my(state.rain.y), Math.max(2, r), 0, Math.PI * 2); vg.fill();
+  }
+  // amici e te
+  if (state.coop) for (const p of state.coop.others.values()) { if (!isAlive(p.id)) continue; px(vg, Math.round(mx(p.x)) - 1, Math.round(my(p.y)) - 1, P.ink, 3, 3); px(vg, Math.round(mx(p.x)), Math.round(my(p.y)), colorOf(p.id)); }
+  const pxm = Math.round(mx(state.x)), pym = Math.round(my(state.y));
+  px(vg, pxm - 2, pym - 2, P.ink, 5, 5); px(vg, pxm - 1, pym - 1, Math.sin(state.time * 4) > 0 ? P.white : myColor(), 3, 3);
+}
 // ---------------- schermata dell'albero delle abilità ----------------
 let treeSel = null;   // telefono: primo tocco legge il nodo, il secondo lo impara
 function drawTree() {
@@ -2672,13 +2774,14 @@ function drawTree() {
 function drawShop() {
   vg.fillStyle = 'rgba(20,10,50,0.55)';
   vg.fillRect(0, 0, VW, VH);
-  const rowH = 30, gap = 3, PAD = 6;
+  const gap = 3, PAD = 6;
   const TABS = [['upg', 'POTENZIAMENTI'], ['tools', 'ATTREZZI']];
   const seedTab = state.rebirths > 0 || !!state.done.garden;
   TABS.push(['maps', 'PRATI']);
   if (seedTab) TABS.push(['seeds', 'SEMI']);
   if (state.shopTab === 'seeds' && !seedTab) state.shopTab = 'upg';
   const rows = state.shopTab === 'tools' ? TOOLS.length : state.shopTab === 'maps' ? MAPS.length : state.shopTab === 'seeds' ? SEEDS.length + 1 : UPG.length;
+  const rowH = clamp(Math.floor((VH - 54) / rows) - gap, 22, 30), sm = rowH < 28;
   const w = 340, h = 42 + rows * (rowH + gap) + 6;
   const x0 = Math.round(VW / 2 - w / 2), y0 = Math.max(2, Math.round(VH / 2 - h / 2));
   popTransform(state.uiT, x0 + w / 2, y0 + h / 2);
@@ -2709,12 +2812,13 @@ function drawShop() {
     const slide = Math.round((1 - easeBack((state.time - state.uiT - i * 0.035) / 0.25)) * 30);
     const ry = rowsY + i * (rowH + gap), rx = x0 + PAD + Math.max(-4, slide), rw = w - PAD * 2;
     panel(rx, ry, rw, rowH, 'dark');
-    panel(rx + 4, ry + 5, 18, 18, 'purple');
-    vg.drawImage(icons[icon], rx + 8, ry + 9);
-    text(name, rx + 28, ry + 6, P.white);
-    text(desc, rx + 28, ry + 17, '#b9a8ff');
-    const bw = 70, bh = 18, bx = rx + rw - bw - 4, by = ry + 6;
-    if (note) text(note, bx - 6, ry + 6, P.goldHi, 1, 'right');
+    const ib = sm ? 16 : 18, iy = ry + Math.floor((rowH - ib) / 2);
+    panel(rx + 4, iy, ib, ib, 'purple');
+    vg.drawImage(icons[icon], rx + 4 + (ib - 10) / 2, iy + (ib - 10) / 2);
+    text(name, rx + 28, ry + (sm ? 3 : 6), P.white);
+    text(desc, rx + 28, ry + (sm ? 13 : 17), '#b9a8ff');
+    const bw = 70, bh = sm ? 15 : 18, bx = rx + rw - bw - 4, by = ry + Math.floor((rowH - bh) / 2);
+    if (note) text(note, bx - 6, ry + (sm ? 3 : 6), P.goldHi, 1, 'right');
     const hov = inside(bx, by, bw, bh);
     panel(bx, by, bw, bh, tone);
     if (hov && tone === 'green') { vg.fillStyle = 'rgba(255,255,255,0.18)'; vg.fillRect(bx + 1, by + 1, bw - 2, bh - 3); }
@@ -2722,7 +2826,7 @@ function drawShop() {
       const ct = fmt(btn.cost);
       const cw = 10 + 3 + textW(ct);
       const sx = Math.round(bx + bw / 2 - cw / 2);
-      vg.drawImage(icons.coin, sx, by + 4);
+      vg.drawImage(icons.coin, sx, by + Math.floor((bh - 10) / 2));
       textRow(ct, sx + 13, by, bh - 1, tone === 'green' ? P.white : '#d8d4ea');
     } else textRow(btn.label, bx + bw / 2, by, bh - 1, P.white, 1, 'center');
     if (mouse.clicked && hov) { onClick(); mouse.clicked = false; }
@@ -2838,7 +2942,8 @@ function drawEnd() {
   vg.fillStyle = 'rgba(20,10,50,0.6)';
   vg.fillRect(0, 0, VW, VH);
   const cx = Math.round(VW / 2), k = Math.min(1, state.screenT / 0.4);
-  const w = 250, h = 176, x0 = Math.round(cx - w / 2), y0 = Math.round(lerp(-h, VH / 2 - h / 2, k));
+  const gain = state.coop ? 0 : seedsNow();
+  const w = 250, h = gain ? 204 : 176, x0 = Math.round(cx - w / 2), y0 = Math.round(lerp(-h, VH / 2 - h / 2, k));
   panel(x0, y0, w, h);
   textFx('HAI FINITO!', cx, y0 + 8, ['#fff2a3', '#ffd23f', '#ff8fc8'][Math.floor(state.time * 3) % 3], 3, 'center', state.screenT < 1 ? 'drop' : 'wave', state.screenT < 1 ? state.screenT : state.time, 2);
   text('LA FATTORIA E TUTTA TAGLIATA', cx, y0 + 36, '#c8ffb0', 1, 'center');
@@ -2856,6 +2961,7 @@ function drawEnd() {
     textRow(a, x0 + 16, ry, 13, P.white);
     textRow(b, x0 + w - 16, ry, 13, P.goldHi, 1, 'right');
   });
+  if (gain && bigButton('RINASCI: +' + gain + ' SEMI', cx, y0 + h - 58, 170, 'gold')) { state.screen = 'game'; rebirth(); state.shop = true; state.shopTab = 'seeds'; state.uiT = state.time; return; }
   if (bigButton('CONTINUA A TAGLIARE', cx, y0 + h - 30, 150, 'green')) { state.screen = 'game'; }
 }
 
@@ -2868,7 +2974,7 @@ function goHome() {
   closeSession();
   save(); syncSave(true);
   state.pause = false; state.settings = false; state.shop = false; state.tree = false;
-  state.screen = 'home'; state.screenT = 0; hasSave = hasProgress();
+  state.screen = 'home'; state.screenT = 0; hasSave = hasProgress() || state.ep > 0;
   syncBody();
   renderHome();
 }
@@ -2989,7 +3095,7 @@ function adoptRemote() {
   if (!best || cmpProg(progress(best.sv), progress(mine)) <= 0) return false;
   applySave(best.sv);
   lsSet(SAVE_KEY, JSON.stringify(saveData()));
-  hasSave = hasProgress();
+  hasSave = hasProgress() || state.ep > 0;
   openMap(state.map); placePlayer(0);
   cam.x = state.x; cam.y = state.y - 10;
   toast('☁️ Ho caricato i progressi del tuo account dall\'altro dispositivo');
@@ -3049,8 +3155,9 @@ function renderHome() {
     <div class="panel" id="pgioca">
       <label class="lb" for="nm">IL TUO NOME</label>
       <input type="text" id="nm" maxlength="16" value="${esc(myName)}" placeholder="COME TI CHIAMI?" autocomplete="off">
-      <button class="pbtn green big" id="bsolo">▶ ${hasSave ? 'CONTINUA DA SOLO' : 'GIOCA DA SOLO'}</button>
-      ${hasSave ? `<div class="note mut" style="text-align:center">${esc(homeSummary())}</div>` : ''}
+      <button class="pbtn green big" id="bsolo">▶ ${hasSave ? 'CONTINUA LA PARTITA' : 'GIOCA DA SOLO'}</button>
+      ${hasSave ? `<div class="note mut" style="text-align:center">${esc(homeSummary())}</div>
+      <button class="pbtn dark big" id="bnuova">✚ INIZIA UNA NUOVA PARTITA</button>` : ''}
       <div class="sep"></div>
       <h3>🤝 PRATO INSIEME</h3>
       <p class="note">Invita gli amici nel tuo prato: tagliate l'erba insieme, ognuno con i suoi attrezzi e potenziamenti, e ognuno tiene le monete che guadagna.</p>
@@ -3059,7 +3166,7 @@ function renderHome() {
     </div>
     <div class="panel dark" id="pstats"><h3>📊 LE TUE STATISTICHE</h3>${statsHTML()}</div>
     <div class="panel dark"><h3>⚙️ ALTRO</h3>
-      <div class="row"><button class="pbtn" id="bimpo">IMPOSTAZIONI</button><button class="pbtn red" id="bnuova">NUOVA PARTITA</button></div>
+      <div class="row"><button class="pbtn" id="bimpo">IMPOSTAZIONI</button></div>
       <p class="note mut">Comandi: WASD o frecce per muoverti, E negozio, K abilità, da 1 a 4 gli attrezzi, Tab menu, T fa passare il tempo più in fretta, M toglie il suono. Sul telefono c'è il joystick in basso a sinistra.</p>
       <p class="note mut">I progressi si salvano da soli su questo dispositivo e, con l'accesso Google di Tavolata, li ritrovi anche sugli altri.</p>
     </div>
@@ -3075,10 +3182,12 @@ function renderHome() {
   jc.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('joinc').click(); };
   document.getElementById('joinc').onclick = () => { const c = jc.value.trim().toUpperCase(); if (!/^[A-Z0-9]{5}$/.test(c)) { toast('Il codice ha 5 caratteri'); jc.focus(); return; } if (serveNome()) openGame(c, true); };
   document.getElementById('bimpo').onclick = () => { state.settings = true; state.uiT = state.time; sfx.open(); };
-  document.getElementById('bnuova').onclick = () => {
+  const bn = document.getElementById('bnuova');
+  if (bn) bn.onclick = () => {
+    if (!serveNome()) return;
     const fai = () => newGame();
-    if (window.Tavolata && Tavolata.conferma) Tavolata.conferma('Nuova partita?', 'Ricominci dal Giardino con zero monete: perdi monete, potenziamenti, attrezzi, prati, semi e rinascite, anche sugli altri dispositivi del tuo account. Le statistiche delle sessioni restano.', 'Ricomincia', fai);
-    else if (confirm('Ricominciare da zero? Perdi tutti i progressi.')) fai();
+    if (window.Tavolata && Tavolata.conferma) Tavolata.conferma('Iniziare una nuova partita?', 'La partita che puoi continuare adesso si cancella (anche sugli altri dispositivi del tuo account) e al suo posto parte quella nuova, dal Giardino con le forbici. Le statistiche delle sessioni restano.', 'Nuova partita', fai);
+    else if (confirm('Iniziare una nuova partita? Quella di adesso si cancella.')) fai();
   };
 }
 
@@ -3366,7 +3475,7 @@ function leaveRoom() {
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
   state.screen = 'home'; state.screenT = 0; state.pause = false;
   syncBody();
-  hasSave = hasProgress();
+  hasSave = hasProgress() || state.ep > 0;
   renderHome();
 }
 
@@ -3481,7 +3590,7 @@ function onLive(id, d) {
 function mirrorRegia(d) {
   const c = state.coop;
   state.t = d.dt; state.day = d.dy; state.fade = d.fd || 0;
-  if (d.gc !== undefined) c.gc = d.gc;
+  if (d.gc !== undefined && d.gc !== c.gc) { c.gc = d.gc; applyGold(c.gc); }
   // pioggia della regia
   const rn = d.rn;
   if (!rn) { if (state.rain) { state.rain = null; coopAskSnap(true); } }
@@ -3685,7 +3794,7 @@ function frame(now) {
 }
 const manual = new URLSearchParams(location.search).has('manual');
 load();
-hasSave = hasProgress();
+hasSave = hasProgress() || state.ep > 0;
 let nuova = false;
 try { if (sessionStorage.getItem('prato-nuova')) { sessionStorage.removeItem('prato-nuova'); nuova = true; } } catch (e) { /* niente */ }
 openMap(state.map);
